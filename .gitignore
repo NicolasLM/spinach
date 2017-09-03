@@ -1,6 +1,10 @@
 .pyc
 __pycache__
+
 spinach.egg-info
 .cache
+dist
+build
 doc/_build
+
 .coverage

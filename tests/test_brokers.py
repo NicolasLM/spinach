@@ -6,7 +6,7 @@ from spinach.brokers.memory import MemoryBroker
 from spinach.brokers.redis.redis import RedisBroker
 from spinach.job import Job
 
-from .conftest import get_utcnow, set_utcnow
+from .conftest import get_now, set_now
 
 
 @pytest.fixture(params=[MemoryBroker, RedisBroker])
@@ -26,11 +26,11 @@ def test_normal_job(broker):
     assert broker.get_job_from_queue('foo_queue') is None
 
 
-def test_future_job(broker, patch_utcnow):
+def test_future_job(broker, patch_now):
     assert broker.next_future_job_delta is None
     assert broker.move_future_jobs() == 0
 
-    job = Job('foo_task', 'foo_queue', get_utcnow() + timedelta(minutes=10),
+    job = Job('foo_task', 'foo_queue', get_now() + timedelta(minutes=10),
               task_args=(1, 2), task_kwargs={'foo': 'bar'})
 
     broker.enqueue_job(job)
@@ -38,7 +38,7 @@ def test_future_job(broker, patch_utcnow):
     assert broker.next_future_job_delta == 600
     assert broker.move_future_jobs() == 0
 
-    set_utcnow(datetime(2017, 9, 2, 9, 00, 56, 482169))
+    set_now(datetime(2017, 9, 2, 9, 00, 56, 482169))
     assert broker.next_future_job_delta == 0
     assert broker.move_future_jobs() == 1
     assert broker.get_job_from_queue('foo_queue') == job

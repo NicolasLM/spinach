@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from logging import getLogger
 import threading
 from typing import Optional
@@ -82,4 +82,4 @@ class Broker(ABC):
         job = self._get_next_future_job()
         if not job:
             return None
-        return (job.at - datetime.utcnow()).total_seconds()
+        return (job.at - datetime.now(timezone.utc)).total_seconds()

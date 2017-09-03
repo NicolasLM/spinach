@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from logging import getLogger
 import threading
 import time
@@ -44,11 +44,23 @@ class Spinach:
         return self._get_task(task_name).func(*args, **kwargs)
 
     def schedule(self, task_name: str, *args, **kwargs):
-        at = datetime.utcnow()
+        """Schedule a job to be executed as soon as possible.
+
+        :arg task_name: Name to the task to execute
+        """
+        at = datetime.now(timezone.utc)
         return self.schedule_at(task_name, at, *args, **kwargs)
 
     def schedule_at(self, task_name: str, at: datetime,
                     *args, **kwargs):
+        """Schedule a job to be executed in the future.
+
+        :arg task_name: Name to the task to execute
+        :arg at: Date at which the job should start. It is advised to pass a
+                 timezone aware datetime to lift any ambiguity. However if a
+                 timezone naive datetime if given, it will be assumed to
+                 contain UTC time.
+        """
         task = self._get_task(task_name)
         job = Job(task.name, task.queue, at=at, task_args=args,
                   task_kwargs=kwargs)

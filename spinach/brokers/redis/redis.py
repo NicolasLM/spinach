@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from logging import getLogger
 import math
 from os import path
@@ -59,7 +59,7 @@ class RedisBroker(Broker):
             self.namespace,
             self._to_namespaced(FUTURE_JOBS_KEY),
             self._to_namespaced(NOTIFICATIONS_KEY),
-            math.ceil(datetime.utcnow().timestamp())
+            math.ceil(datetime.now(timezone.utc).timestamp())
         ])
         logger.debug("Redis moved %s job(s) from future to current queues",
                      num_jobs_moved)

@@ -1,8 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import json
+from logging import getLogger
 import math
 from typing import Optional
 import uuid
+
+logger = getLogger(__name__)
 
 
 class Job:
@@ -16,7 +19,16 @@ class Job:
         self.id = uuid.uuid4()
         self.task_name = task_name
         self.queue = queue
-        self.at = at
+
+        if at.tzinfo is None:
+            # TZ naive datetime, make it a TZ aware datetime by assuming it
+            # contains UTC time
+            self.at = at.replace(tzinfo=timezone.utc)
+            logger.debug('Job created from a naive datetime, assuming UTC')
+        else:
+            # TZ aware datetime, store it in its UTC representation
+            self.at = at.astimezone(timezone.utc)
+
         self.task_args = task_args if task_args else tuple()
         self.task_kwargs = task_kwargs if task_kwargs else dict()
 
@@ -25,7 +37,7 @@ class Job:
 
     @property
     def should_start(self) -> bool:
-        return datetime.utcnow() >= self.at
+        return datetime.now(timezone.utc) >= self.at
 
     @property
     def at_timestamp(self) -> Optional[int]:
@@ -47,7 +59,7 @@ class Job:
         job = Job(
             job_dict['task_name'],
             job_dict['queue'],
-            at=datetime.fromtimestamp(job_dict['at']),
+            at=datetime.fromtimestamp(job_dict['at'], tz=timezone.utc),
             task_args=tuple(job_dict['task_args']),
             task_kwargs=job_dict['task_kwargs'],
         )

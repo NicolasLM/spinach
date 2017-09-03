@@ -5,12 +5,12 @@ import pytest
 
 from spinach.job import Job
 
-from .conftest import get_utcnow, set_utcnow
+from .conftest import get_now, set_now
 
 
 @pytest.fixture
-def job(patch_utcnow):
-    job = Job('foo_task', 'foo_queue', get_utcnow(),
+def job(patch_now):
+    job = Job('foo_task', 'foo_queue', get_now(),
               task_args=(1, 2), task_kwargs={'foo': 'bar'})
     return job
 
@@ -21,7 +21,7 @@ def test_serialization(job):
 
 
 def test_at_timestamp(job):
-    assert job.at_timestamp == 1504335057
+    assert job.at_timestamp == 1504342257
 
 
 def test_should_start(job):
@@ -29,11 +29,11 @@ def test_should_start(job):
     assert job.should_start
 
     # A bit later
-    set_utcnow(get_utcnow() + timedelta(minutes=1))
+    set_now(get_now() + timedelta(minutes=1))
     assert job.should_start
 
     # A bit earlier
-    set_utcnow(get_utcnow() - timedelta(minutes=2))
+    set_now(get_now() - timedelta(minutes=2))
     assert not job.should_start
 
 

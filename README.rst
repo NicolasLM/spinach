@@ -3,6 +3,9 @@ Spinach
 
 Redis task queue for Python 3 heavily inspired by Celery and RQ.
 
+.. image:: https://travis-ci.org/NicolasLM/spinach.svg?branch=master
+    :target: https://travis-ci.org/NicolasLM/spinach
+
 Distinctive features:
 
 - Threads first, workers are lightweight
@@ -20,9 +23,11 @@ Install Spinach with pip::
 
    pip install spinach
 
-Create task and schedule two jobs, one executed now and one later::
+Create task and schedule two jobs, one executed now and one later:
 
-    from datetime import datetime, timedelta
+.. code:: python
+
+    from datetime import datetime, timedelta, timezone
 
     from spinach import Tasks, MemoryBroker, Spinach
 
@@ -41,7 +46,7 @@ Create task and schedule two jobs, one executed now and one later::
     spin.schedule('compute', 5, 3)
 
     # Schedule a job to be executed in 10 seconds
-    in_10_seconds = datetime.utcnow() + timedelta(seconds=10)
+    in_10_seconds = datetime.now(timezone.utc) + timedelta(seconds=10)
     spin.schedule_at('compute', in_10_seconds, 20, 10)
 
     print('Starting workers, ^C to quit')

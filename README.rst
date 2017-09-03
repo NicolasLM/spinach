@@ -1,10 +1,12 @@
 Spinach
 =======
 
-Redis task queue for Python 3 heavily inspired by Celery and RQ.
-
 .. image:: https://travis-ci.org/NicolasLM/spinach.svg?branch=master
     :target: https://travis-ci.org/NicolasLM/spinach
+.. image:: https://coveralls.io/repos/github/NicolasLM/spinach/badge.svg?branch=master
+    :target: https://coveralls.io/github/NicolasLM/spinach?branch=master
+
+Redis task queue for Python 3 heavily inspired by Celery and RQ.
 
 Distinctive features:
 

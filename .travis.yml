@@ -15,6 +15,7 @@ script:
     - pep8 spinach tests
 
 after_success:
+  - pip install python-coveralls
   - coveralls
 
 notifications:

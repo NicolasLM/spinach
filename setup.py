@@ -39,7 +39,7 @@ setup(
     ],
     keywords='task queue jobs redis',
 
-    packages=find_packages(include=('spinach',)),
+    packages=find_packages(include=('spinach', 'spinach.*')),
     install_requires=[
         'redis'
     ],

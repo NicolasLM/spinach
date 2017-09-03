@@ -1,0 +1,21 @@
+services:
+  - redis-server
+
+language: python
+
+python:
+    - "3.5"
+    - "3.6"
+
+install:
+    - pip install -e .[tests]
+
+script:
+    - pytest -v --cov=spinach tests/
+    - pep8 spinach tests
+
+after_success:
+  - coveralls
+
+notifications:
+    email: false

@@ -32,7 +32,7 @@ def patch_now(monkeypatch):
             return datetime.fromtimestamp(*args, **kwargs)
 
     monkeypatch.setattr('spinach.brokers.base.datetime', MyDatetime)
-    monkeypatch.setattr('spinach.brokers.redis.redis.datetime', MyDatetime)
+    monkeypatch.setattr('spinach.brokers.redis.datetime', MyDatetime)
     monkeypatch.setattr('spinach.job.datetime', MyDatetime)
     monkeypatch.setattr('spinach.spinach.datetime', MyDatetime)
 

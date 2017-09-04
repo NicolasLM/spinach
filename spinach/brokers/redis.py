@@ -35,7 +35,7 @@ class RedisBroker(Broker):
         self._must_stop = threading.Event()
 
     def _load_script(self, filename: str) -> Script:
-        with open(path.join(here, filename), mode='rb') as f:
+        with open(path.join(here, 'redis_scripts', filename), mode='rb') as f:
             script_data = f.read()
         return self._r.register_script(script_data)
 

@@ -1,6 +1,6 @@
 import pytest
 
-from spinach.brokers.redis.redis import RedisBroker
+from spinach.brokers.redis import RedisBroker
 
 
 @pytest.fixture

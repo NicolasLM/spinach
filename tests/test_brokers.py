@@ -3,11 +3,10 @@ from unittest.mock import patch
 
 import pytest
 
-from spinach.brokers.memory import MemoryBroker
-from spinach.brokers.redis.redis import RedisBroker
-from spinach.job import Job
 from spinach import const
-
+from spinach.brokers.memory import MemoryBroker
+from spinach.brokers.redis import RedisBroker
+from spinach.job import Job
 from .conftest import get_now, set_now
 
 

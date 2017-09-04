@@ -53,10 +53,11 @@ setup(
     },
 
     package_data={
-        'spinach.brokers.redis': [
+        'spinach.brokers.redis_scripts': [
             'move_future_jobs.lua',
             'enqueue_job.lua',
-            'enqueue_future_job.lua'
+            'enqueue_future_job.lua',
+            'flush.lua'
         ],
     },
 )

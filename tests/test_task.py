@@ -84,3 +84,15 @@ def test_tasks_decorator():
     assert 'bar' in str(tasks.tasks['bar'].func)
     assert tasks.tasks['bar'].name == 'bar'
     assert tasks.tasks['bar'].queue == 'task_queue'
+
+
+def test_task_function_can_be_called():
+
+    tasks = Tasks()
+
+    @tasks.task(name='foo')
+    def foo(a, b=2):
+        return a + b
+
+    assert foo(40) == 42
+    assert foo(40, 3) == 43

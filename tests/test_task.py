@@ -41,6 +41,8 @@ def test_tasks_add(task):
         tasks.add(print, 'write_to_stdout', queue='bar_queue')
     with pytest.raises(ValueError):
         tasks.add(print, queue='bar_queue')
+    with pytest.raises(ValueError):
+        tasks.add(print, name='internal', queue='_internal_queue')
     assert tasks.tasks == {
         'write_to_stdout': task
     }

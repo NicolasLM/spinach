@@ -68,4 +68,8 @@ class Tasks:
             else:
                 queue = const.DEFAULT_QUEUE
 
+        if queue and queue.startswith('_'):
+            raise ValueError('Queues starting with "_" are reserved by '
+                             'Spinach for internal use')
+
         self._tasks[name] = Task(func, name, queue)

@@ -15,9 +15,11 @@ from .conftest import get_now, set_now
 def broker(request):
     broker = request.param()
     broker.namespace = 'tests'
+    broker.flush()
     broker.start()
     yield broker
     broker.stop()
+    broker.flush()
 
 
 def test_normal_job(broker):
@@ -72,3 +74,11 @@ def test_wait_for_events_with_future_job(broker, patch_now, delta, timeout):
     with patch.object(broker, '_something_happened') as mock_sh:
         broker.wait_for_event()
         mock_sh.wait.assert_called_once_with(timeout=timeout)
+
+
+def test_flush(broker):
+    broker.enqueue_job(Job('t1', 'q1', get_now()))
+    broker.enqueue_job(Job('t2', 'q2', get_now() + timedelta(seconds=10)))
+    broker.flush()
+    assert broker.get_job_from_queue('q1') is None
+    assert broker.next_future_job_delta is None

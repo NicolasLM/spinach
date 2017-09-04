@@ -83,3 +83,7 @@ class Broker(ABC):
         if not job:
             return None
         return (job.at - datetime.now(timezone.utc)).total_seconds()
+
+    @abstractmethod
+    def flush(self):
+        """Delete everything in the namespace."""

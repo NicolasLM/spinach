@@ -13,9 +13,9 @@ class MemoryBroker(Broker):
 
     def __init__(self):
         super().__init__()
+        self._lock = threading.RLock()
         self._queues = dict()
         self._future_jobs = list()
-        self._lock = threading.RLock()
 
     def _get_queue(self, queue_name: str):
         queue_name = self._to_namespaced(queue_name)
@@ -66,3 +66,8 @@ class MemoryBroker(Broker):
             return None
         else:
             return Job.deserialize(job_json_string)
+
+    def flush(self):
+        with self._lock:
+            self._queues = dict()
+            self._future_jobs = list()

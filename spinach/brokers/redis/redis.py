@@ -29,6 +29,7 @@ class RedisBroker(Broker):
         self._move_future_jobs = self._load_script('move_future_jobs.lua')
         self._enqueue_job = self._load_script('enqueue_job.lua')
         self._enqueue_future_job = self._load_script('enqueue_future_job.lua')
+        self._flush = self._load_script('flush.lua')
 
         self._subscriber_thread = None
         self._must_stop = threading.Event()
@@ -108,3 +109,6 @@ class RedisBroker(Broker):
     def stop(self):
         super().stop()
         self._must_stop.set()
+
+    def flush(self):
+        self._flush(args=[self.namespace])

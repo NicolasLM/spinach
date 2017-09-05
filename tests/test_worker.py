@@ -1,9 +1,10 @@
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 import time
 
 import pytest
 
+from spinach import signals
 from spinach.worker import MaxUnfinishedQueue, Workers
 from spinach.job import Job
 
@@ -92,3 +93,30 @@ def test_start_stop_n_workers(number):
         assert 'tests-worker-' in thread.name
 
     workers.stop()
+
+
+def test_worker_signals(job):
+    job, task_func = job
+    callback = Mock()
+
+    mock_job_started_receiver = Mock(spec={})
+    signals.job_started.connect(mock_job_started_receiver)
+
+    mock_job_finished_receiver = Mock(spec={})
+    signals.job_finished.connect(mock_job_finished_receiver)
+
+    mock_worker_started_receiver = Mock(spec={})
+    signals.worker_started.connect(mock_worker_started_receiver)
+
+    mock_worker_terminated_receiver = Mock(spec={})
+    signals.worker_terminated.connect(mock_worker_terminated_receiver)
+
+    workers = Workers(callback, 2, 'tests')
+    workers.submit_job(job)
+    wait_for_queue_empty(workers)
+    workers.stop()
+
+    mock_job_started_receiver.assert_called_once()
+    mock_job_finished_receiver.assert_called_once()
+    assert mock_worker_started_receiver.call_count == 2
+    assert mock_worker_terminated_receiver.call_count == 2

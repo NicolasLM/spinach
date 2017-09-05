@@ -41,7 +41,8 @@ setup(
 
     packages=find_packages(include=('spinach', 'spinach.*')),
     install_requires=[
-        'redis'
+        'redis',
+        'blinker'
     ],
 
     extras_require={

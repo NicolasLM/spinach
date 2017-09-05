@@ -6,6 +6,7 @@ from typing import Callable
 
 from .job import Job
 from .utils import human_duration
+from . import signals
 
 logger = getLogger(__name__)
 
@@ -51,7 +52,10 @@ class Workers:
             self._threads.append(thread)
 
     def _worker_func(self):
-        logger.debug('Worker %s started', threading.current_thread().name)
+        worker_name = threading.current_thread().name
+        logger.debug('Worker %s started', worker_name)
+        signals.worker_started.send(worker_name=worker_name)
+
         while True:
             item = self._queue.get()
 
@@ -62,6 +66,7 @@ class Workers:
 
             job = item
             logger.info('Starting execution of %s', job)
+            signals.job_started.send(job=job)
             start_time = time.monotonic()
             try:
                 job.task_func(*job.task_args, **job.task_kwargs)
@@ -73,9 +78,12 @@ class Workers:
                 duration = human_duration(time.monotonic() - start_time)
                 logger.info('Finished execution of %s in %s', job, duration)
             finally:
+                signals.job_finished.send(job=job)
                 self._queue.task_done()
                 self._job_finished_callback(job)
-        logger.debug('Worker %s terminated', threading.current_thread().name)
+
+        logger.debug('Worker %s terminated', worker_name)
+        signals.worker_terminated.send(worker_name=worker_name)
 
     def submit_job(self, job: Job):
         if self._must_stop.is_set():

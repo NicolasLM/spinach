@@ -48,6 +48,7 @@ setup(
         'tests': [
             'pytest',
             'pytest-cov',
+            'pytest-threadleak',
             'pep8'
         ],
     },

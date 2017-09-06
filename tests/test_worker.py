@@ -1,5 +1,5 @@
 from datetime import datetime
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, ANY
 import time
 
 import pytest
@@ -111,12 +111,17 @@ def test_worker_signals(job):
     mock_worker_terminated_receiver = Mock(spec={})
     signals.worker_terminated.connect(mock_worker_terminated_receiver)
 
-    workers = Workers(callback, 2, 'tests')
+    ns = 'tests'
+    workers = Workers(callback, 1, ns)
     workers.submit_job(job)
     wait_for_queue_empty(workers)
     workers.stop()
 
-    mock_job_started_receiver.assert_called_once()
-    mock_job_finished_receiver.assert_called_once()
-    assert mock_worker_started_receiver.call_count == 2
-    assert mock_worker_terminated_receiver.call_count == 2
+    mock_job_started_receiver.assert_called_once_with(ns, job=ANY)
+    mock_job_finished_receiver.assert_called_once_with(ns, job=ANY)
+    mock_worker_started_receiver.assert_called_once_with(
+        ns, worker_name='tests-worker-0'
+    )
+    mock_worker_terminated_receiver.assert_called_once_with(
+        ns, worker_name='tests-worker-0'
+    )

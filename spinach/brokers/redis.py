@@ -12,18 +12,15 @@ from spinach.brokers.base import Broker
 from spinach.job import Job
 from spinach.const import FUTURE_JOBS_KEY, NOTIFICATIONS_KEY
 
-
 logger = getLogger('spinach.broker')
-
-
 here = path.abspath(path.dirname(__file__))
 
 
 class RedisBroker(Broker):
 
-    def __init__(self):
+    def __init__(self, redis: Optional[StrictRedis]=None):
         super().__init__()
-        self._r = StrictRedis()
+        self._r = redis if redis else StrictRedis()
 
         # Register the lua scripts
         self._move_future_jobs = self._load_script('move_future_jobs.lua')

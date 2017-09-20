@@ -138,3 +138,15 @@ def test_worker_signals(job):
     mock_worker_terminated_receiver.assert_called_once_with(
         ns, worker_name='tests-worker-0'
     )
+
+
+def test_can_accept_job(workers, job):
+    workers, callback = workers
+    assert workers.can_accept_job()
+
+    workers.submit_job(job)
+    workers.submit_job(job)
+    assert not workers.can_accept_job()
+
+    workers.stop()
+    assert not workers.can_accept_job()

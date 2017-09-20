@@ -1,5 +1,5 @@
 import copy
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -48,6 +48,10 @@ def test_should_retry(job):
     job.retries = 0
     assert job.should_retry
 
+    job.max_retries = float('+inf')
+    job.retries = 93593956
+    assert job.should_retry
+
     job.max_retries = 10
     job.retries = 10
     assert not job.should_retry
@@ -72,3 +76,10 @@ def test_eq(job):
     job_2 = copy.deepcopy(job)
     job_2.task_name = 'bar_task'
     assert job != job_2
+
+
+def test_at_timezone_naive():
+    now_naive = datetime.utcnow()
+    job = Job('foo_task', 'foo_queue', now_naive, 5,
+              task_args=(1, 2), task_kwargs={'foo': 'bar'})
+    assert job.at.tzinfo is timezone.utc

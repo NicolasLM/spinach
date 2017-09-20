@@ -2,9 +2,10 @@ from datetime import datetime, timezone
 from logging import getLogger
 import threading
 import time
+from typing import Optional
 
 from .task import Task, Tasks
-from .job import Job
+from .job import Job, JobStatus
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE
 from .worker import Workers
@@ -62,7 +63,7 @@ class Spinach:
                  contain UTC time.
         """
         task = self._get_task(task_name)
-        job = Job(task.name, task.queue, at=at, task_args=args,
+        job = Job(task.name, task.queue, at, task.max_retries, task_args=args,
                   task_kwargs=kwargs)
         return self._broker.enqueue_job(job)
 
@@ -125,6 +126,7 @@ class Spinach:
         self._workers.stop()
         self._broker.stop()
 
-    def _job_finished_callback(self, job: Job):
+    def _job_finished_callback(self, job: Job, err: Optional[Exception]):
         """Function called by a worker when a job is finished."""
-        self._broker.job_finished(job)
+        assert job.status is JobStatus.RUNNING
+        self._broker.job_ran(job, err)

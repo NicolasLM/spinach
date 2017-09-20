@@ -1,20 +1,26 @@
+from datetime import timedelta
 import functools
 from typing import Optional, Callable
+from numbers import Number
+import random
 
 from . import const
 
 
 class Task:
 
-    __slots__ = ['func', 'name', 'queue']
+    __slots__ = ['func', 'name', 'queue', 'max_retries']
 
-    def __init__(self, func: Callable, name: str, queue: str):
+    def __init__(self, func: Callable, name: str, queue: str,
+                 max_retries: Number):
         self.func = func
         self.name = name
         self.queue = queue
+        self.max_retries = max_retries
 
     def __repr__(self):
-        return 'Task({}, {}, {})'.format(self.func, self.name, self.queue)
+        return 'Task({}, {}, {}, {})'.format(self.func, self.name,
+                                             self.queue, self.max_retries)
 
     def __eq__(self, other):
         for attr in self.__slots__:
@@ -33,43 +39,66 @@ class Tasks:
     concurrently.
     """
 
-    def __init__(self, queue: Optional[str]=None):
+    def __init__(self, queue: Optional[str]=None,
+                 max_retries: Optional[Number]=None):
         self._tasks = {}
         self.queue = queue
+        self.max_retries = max_retries
 
     @property
     def tasks(self) -> dict:
         return self._tasks
 
     def task(self, func: Optional[Callable]=None, name: Optional[str]=None,
-             queue: Optional[str]=None):
+             queue: Optional[str]=None, max_retries: Optional[Number]=None):
 
         if func is None:
-            return functools.partial(self.task, name=name, queue=queue)
+            return functools.partial(self.task, name=name, queue=queue,
+                                     max_retries=max_retries)
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
 
-        self.add(func, name=name, queue=queue)
+        self.add(func, name=name, queue=queue, max_retries=max_retries)
 
         return wrapper
 
     def add(self, func: Callable, name: Optional[str]=None,
-            queue: Optional[str]=None):
+            queue: Optional[str]=None, max_retries: Optional[Number]=None):
         if not name:
             raise ValueError('Each Spinach task needs a name')
         if name in self._tasks:
             raise ValueError('A task named {} already exists'.format(name))
 
-        if not queue:
+        if queue is None:
             if self.queue:
                 queue = self.queue
             else:
                 queue = const.DEFAULT_QUEUE
 
+        if max_retries is None:
+            if self.max_retries:
+                max_retries = self.max_retries
+            else:
+                max_retries = const.DEFAULT_MAX_RETRIES
+
         if queue and queue.startswith('_'):
             raise ValueError('Queues starting with "_" are reserved by '
                              'Spinach for internal use')
 
-        self._tasks[name] = Task(func, name, queue)
+        self._tasks[name] = Task(func, name, queue, max_retries)
+
+
+def exponential_backoff(attempt: int) -> timedelta:
+    """Calculate a delay to retry using an exponential backoff algorithm.
+
+    It is an exponential backoff with random jitter to prevent all failed tasks
+    from being retried at the same time. It is a good fit for most
+    applications.
+    """
+    cap = 1200  # max 20 minutes
+    base = 3
+
+    temp = min(base * 2 ** attempt, cap)
+    return timedelta(seconds=temp / 2 + random.randint(0, temp / 2))

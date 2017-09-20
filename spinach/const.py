@@ -2,6 +2,7 @@ VERSION = '0.0.3.dev1'
 
 DEFAULT_QUEUE = 'spinach'
 DEFAULT_NAMESPACE = 'spinach'
+DEFAULT_MAX_RETRIES = 0
 
 FUTURE_JOBS_KEY = '_future-jobs'
 NOTIFICATIONS_KEY = '_notifications'

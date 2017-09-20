@@ -1,5 +1,5 @@
-from datetime import datetime
-from unittest.mock import Mock, MagicMock, ANY
+from datetime import datetime, timezone
+from unittest.mock import Mock, ANY
 import time
 
 import pytest
@@ -22,7 +22,7 @@ def workers():
 @pytest.fixture
 def job():
     task_func = Mock()
-    job = Job('foo_task', 'foo_queue', datetime.utcnow(),
+    job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 10,
               task_args=(1, 2), task_kwargs={'foo': 'bar'})
     job.task_func = task_func
 
@@ -69,9 +69,22 @@ def test_job_execution(workers, job):
     workers.submit_job(job)
     wait_for_queue_empty(workers)
 
+    # Executed function raised no error
     task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
-    callback.assert_called_once_with(job)
+    callback.assert_called_once_with(job, None)
     assert workers.can_accept_job()
+
+    # Executed function raised an error
+    callback.reset_mock()
+    task_func.reset_mock()
+    error = RuntimeError('Error')
+    task_func.side_effect = error
+
+    workers.submit_job(job)
+    wait_for_queue_empty(workers)
+
+    task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
+    callback.assert_called_once_with(job, error)
 
 
 def test_submit_job_shutdown_workers(workers, job):

@@ -70,17 +70,18 @@ class Workers:
             start_time = time.monotonic()
             try:
                 job.task_func(*job.task_args, **job.task_kwargs)
-            except Exception:
+            except Exception as e:
                 duration = human_duration(time.monotonic() - start_time)
                 logger.exception('Error during execution of %s after %s', job,
                                  duration)
+                self._job_finished_callback(job, e)
             else:
                 duration = human_duration(time.monotonic() - start_time)
                 logger.info('Finished execution of %s in %s', job, duration)
+                self._job_finished_callback(job, None)
             finally:
                 signals.job_finished.send(self._namespace, job=job)
                 self._queue.task_done()
-                self._job_finished_callback(job)
 
         logger.debug('Worker %s terminated', worker_name)
         signals.worker_terminated.send(self._namespace,

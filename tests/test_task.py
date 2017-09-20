@@ -1,24 +1,27 @@
 import copy
+from datetime import timedelta
 
 import pytest
 
-from spinach.task import Task, Tasks
+from spinach.task import Task, Tasks, exponential_backoff
 from spinach import const
 
 
 @pytest.fixture
 def task():
-    return Task(print, 'write_to_stdout', 'foo_queue')
+    return Task(print, 'write_to_stdout', 'foo_queue', 0)
 
 
 def test_task(task):
     assert task.func is print
     assert task.name == 'write_to_stdout'
     assert task.queue == 'foo_queue'
+    assert task.max_retries == 0
 
     assert 'print' in repr(task)
     assert 'write_to_stdout' in repr(task)
     assert 'foo_queue' in repr(task)
+    assert '0' in repr(task)
 
 
 def test_task_eq(task):
@@ -48,21 +51,25 @@ def test_tasks_add(task):
     }
 
 
-def test_tasks_queues():
-    # Constant default queue
+def test_tasks_queues_and_max_retries():
+    # Constant default
     tasks = Tasks()
     tasks.add(print, 'write_to_stdout')
     assert tasks.tasks['write_to_stdout'].queue == const.DEFAULT_QUEUE
+    assert (tasks.tasks['write_to_stdout'].max_retries ==
+            const.DEFAULT_MAX_RETRIES)
 
-    # Tasks has a default queue
-    tasks = Tasks(queue='tasks_default')
+    # Tasks has a default
+    tasks = Tasks(queue='tasks_default', max_retries=10)
     tasks.add(print, 'write_to_stdout')
     assert tasks.tasks['write_to_stdout'].queue == 'tasks_default'
+    assert tasks.tasks['write_to_stdout'].max_retries == 10
 
-    # Task added with an explicit queue
-    tasks = Tasks(queue='tasks_default')
-    tasks.add(print, 'write_to_stdout', queue='task_queue')
+    # Task added with an explicit value
+    tasks = Tasks(queue='tasks_default', max_retries=10)
+    tasks.add(print, 'write_to_stdout', queue='task_queue', max_retries=20)
     assert tasks.tasks['write_to_stdout'].queue == 'task_queue'
+    assert tasks.tasks['write_to_stdout'].max_retries == 20
 
 
 def test_tasks_decorator():
@@ -73,17 +80,19 @@ def test_tasks_decorator():
     def foo():
         pass
 
-    @tasks.task(name='bar', queue='task_queue')
+    @tasks.task(name='bar', queue='task_queue', max_retries=20)
     def bar():
         pass
 
     assert 'foo' in str(tasks.tasks['foo'].func)
     assert tasks.tasks['foo'].name == 'foo'
     assert tasks.tasks['foo'].queue == 'tasks_queue'
+    assert tasks.tasks['foo'].max_retries == const.DEFAULT_MAX_RETRIES
 
     assert 'bar' in str(tasks.tasks['bar'].func)
     assert tasks.tasks['bar'].name == 'bar'
     assert tasks.tasks['bar'].queue == 'task_queue'
+    assert tasks.tasks['bar'].max_retries == 20
 
 
 def test_task_function_can_be_called():
@@ -96,3 +105,13 @@ def test_task_function_can_be_called():
 
     assert foo(40) == 42
     assert foo(40, 3) == 43
+
+
+def test_exponential_backoff():
+    with pytest.raises(ValueError):
+        exponential_backoff(0)
+
+    assert (
+        timedelta(seconds=3) <= exponential_backoff(1) <= timedelta(seconds=6)
+    )
+    assert exponential_backoff(10000) <= timedelta(minutes=20)

@@ -8,9 +8,9 @@ from typing import Optional
 from redis import StrictRedis
 from redis.client import Script
 
-from spinach.brokers.base import Broker
-from spinach.job import Job
-from spinach.const import FUTURE_JOBS_KEY, NOTIFICATIONS_KEY
+from ..brokers.base import Broker
+from ..job import Job, JobStatus
+from ..const import FUTURE_JOBS_KEY, NOTIFICATIONS_KEY
 
 logger = getLogger('spinach.broker')
 here = path.abspath(path.dirname(__file__))
@@ -39,12 +39,14 @@ class RedisBroker(Broker):
     def enqueue_job(self, job: Job):
         """Add a job to a queue"""
         if job.should_start:
+            job.status = JobStatus.QUEUED
             self._enqueue_job(args=[
                 self._to_namespaced(job.queue),
                 self._to_namespaced(NOTIFICATIONS_KEY),
                 job.serialize()
             ])
         else:
+            job.status = JobStatus.WAITING
             self._enqueue_future_job(args=[
                 self._to_namespaced(FUTURE_JOBS_KEY),
                 self._to_namespaced(NOTIFICATIONS_KEY),
@@ -57,7 +59,8 @@ class RedisBroker(Broker):
             self.namespace,
             self._to_namespaced(FUTURE_JOBS_KEY),
             self._to_namespaced(NOTIFICATIONS_KEY),
-            math.ceil(datetime.now(timezone.utc).timestamp())
+            math.ceil(datetime.now(timezone.utc).timestamp()),
+            JobStatus.QUEUED.value
         ])
         logger.debug("Redis moved %s job(s) from future to current queues",
                      num_jobs_moved)
@@ -73,10 +76,13 @@ class RedisBroker(Broker):
         return Job.deserialize(job[0].decode())
 
     def get_job_from_queue(self, queue: str) -> Optional[Job]:
-        job = self._r.lpop(self._to_namespaced(queue))
-        if not job:
+        job_json_string = self._r.lpop(self._to_namespaced(queue))
+        if not job_json_string:
             return None
-        return Job.deserialize(job.decode())
+
+        job = Job.deserialize(job_json_string.decode())
+        job.status = JobStatus.RUNNING
+        return job
 
     def _subscriber_func(self):
         logger.debug('Redis broker subscriber started')

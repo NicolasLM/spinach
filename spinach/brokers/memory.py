@@ -4,7 +4,7 @@ import threading
 from typing import Optional
 
 from .base import Broker
-from ..job import Job
+from ..job import Job, JobStatus
 
 logger = getLogger('spinach.broker')
 
@@ -29,10 +29,12 @@ class MemoryBroker(Broker):
 
     def enqueue_job(self, job: Job):
         if job.should_start:
+            job.status = JobStatus.QUEUED
             queue = self._get_queue(job.queue)
             queue.put(job.serialize())
         else:
             with self._lock:
+                job.status = JobStatus.WAITING
                 self._future_jobs.append(job.serialize())
                 self._future_jobs.sort(key=lambda j: Job.deserialize(j).at)
         self._something_happened.set()
@@ -43,6 +45,7 @@ class MemoryBroker(Broker):
             job = self._get_next_future_job()
 
             while job and job.should_start:
+                job.status = JobStatus.QUEUED
                 queue = self._get_queue(job.queue)
                 queue.put(job.serialize())
                 self._future_jobs.pop(0)
@@ -65,7 +68,9 @@ class MemoryBroker(Broker):
         except Empty:
             return None
         else:
-            return Job.deserialize(job_json_string)
+            job = Job.deserialize(job_json_string)
+            job.status = JobStatus.RUNNING
+            return job
 
     def flush(self):
         with self._lock:

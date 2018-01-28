@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import functools
 from typing import Optional, Callable
 from numbers import Number
@@ -44,6 +44,7 @@ class Tasks:
         self._tasks = {}
         self.queue = queue
         self.max_retries = max_retries
+        self._spin = None
 
     @property
     def tasks(self) -> dict:
@@ -88,6 +89,21 @@ class Tasks:
                              'Spinach for internal use')
 
         self._tasks[name] = Task(func, name, queue, max_retries)
+
+    def _require_attached_tasks(self):
+        if self._spin is None:
+            raise RuntimeError(
+                'Cannot execute tasks until the tasks have been attached to '
+                'a Spinach instance.'
+            )
+
+    def schedule(self, task_name: str, *args, **kwargs):
+        self._require_attached_tasks()
+        self._spin.schedule(task_name, *args, **kwargs)
+
+    def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
+        self._require_attached_tasks()
+        self._spin.schedule_at(task_name, at, *args, **kwargs)
 
 
 def exponential_backoff(attempt: int) -> timedelta:

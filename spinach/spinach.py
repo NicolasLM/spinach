@@ -34,6 +34,7 @@ class Spinach:
 
     def attach_tasks(self, tasks: Tasks):
         self._tasks.update(tasks.tasks)
+        tasks._spin = self
 
     def _get_task(self, name) -> Task:
         try:
@@ -52,8 +53,7 @@ class Spinach:
         at = datetime.now(timezone.utc)
         return self.schedule_at(task_name, at, *args, **kwargs)
 
-    def schedule_at(self, task_name: str, at: datetime,
-                    *args, **kwargs):
+    def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
         """Schedule a job to be executed in the future.
 
         :arg task_name: Name to the task to execute

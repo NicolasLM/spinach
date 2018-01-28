@@ -1,10 +1,13 @@
 import copy
 from datetime import timedelta
+from unittest import mock
 
 import pytest
 
 from spinach.task import Task, Tasks, exponential_backoff
 from spinach import const
+
+from .conftest import get_now
 
 
 @pytest.fixture
@@ -105,6 +108,25 @@ def test_task_function_can_be_called():
 
     assert foo(40) == 42
     assert foo(40, 3) == 43
+
+
+def test_tasks_scheduling(task):
+    tasks = Tasks()
+    tasks.add(print, 'write_to_stdout', queue='foo_queue')
+
+    with pytest.raises(RuntimeError):
+        tasks.schedule('write_to_stdout')
+    with pytest.raises(RuntimeError):
+        tasks.schedule_at('write_to_stdout', get_now())
+
+    spin = mock.Mock()
+    tasks._spin = spin
+
+    tasks.schedule('write_to_stdout')
+    spin.schedule.assert_called_once_with('write_to_stdout')
+
+    tasks.schedule_at('write_to_stdout', get_now())
+    spin.schedule_at.assert_called_once_with('write_to_stdout', get_now())
 
 
 def test_exponential_backoff():

@@ -40,7 +40,10 @@ class Spinach:
         try:
             return self._tasks[name]
         except KeyError:
-            ValueError('Task {} is not known'.format(name))
+            raise ValueError(
+                'Unknown task "{}". Known tasks: {}'
+                .format(name, list(self._tasks.keys()))
+            )
 
     def execute(self, task_name: str, *args, **kwargs):
         return self._get_task(task_name).func(*args, **kwargs)

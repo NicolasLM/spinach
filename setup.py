@@ -59,7 +59,8 @@ setup(
             'move_future_jobs.lua',
             'enqueue_job.lua',
             'enqueue_future_job.lua',
-            'flush.lua'
+            'flush.lua',
+            'get_job_from_queue.lua'
         ],
     },
 )

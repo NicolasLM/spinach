@@ -10,11 +10,17 @@ from redis.client import Script
 
 from ..brokers.base import Broker
 from ..job import Job, JobStatus
-from ..const import FUTURE_JOBS_KEY, NOTIFICATIONS_KEY
+from ..const import FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY
 
 logger = getLogger('spinach.broker')
 here = path.abspath(path.dirname(__file__))
 
+
+# Todo: make move_future_jobs into a more generic task not always executed at
+# arbiter loop (like once per minute) that:
+# - moves future jobs
+# - registers the broker
+# - moves running jobs from stale brokers
 
 class RedisBroker(Broker):
 
@@ -27,6 +33,7 @@ class RedisBroker(Broker):
         self._enqueue_job = self._load_script('enqueue_job.lua')
         self._enqueue_future_job = self._load_script('enqueue_future_job.lua')
         self._flush = self._load_script('flush.lua')
+        self._get_job_from_queue = self._load_script('get_job_from_queue.lua')
 
         self._subscriber_thread = None
         self._must_stop = threading.Event()
@@ -36,32 +43,43 @@ class RedisBroker(Broker):
             script_data = f.read()
         return self._r.register_script(script_data)
 
+    def _run_script(self, script: Script, *args):
+        args = [str(self._id)] + list(args)
+        return script(args=args)
+
     def enqueue_job(self, job: Job):
-        """Add a job to a queue"""
+        """Add a job to a queue."""
         if job.should_start:
             job.status = JobStatus.QUEUED
-            self._enqueue_job(args=[
+            self._run_script(
+                self._enqueue_job,
                 self._to_namespaced(job.queue),
                 self._to_namespaced(NOTIFICATIONS_KEY),
-                job.serialize()
-            ])
+                job.serialize(),
+                job.id,
+                self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+            )
         else:
             job.status = JobStatus.WAITING
-            self._enqueue_future_job(args=[
+            self._run_script(
+                self._enqueue_future_job,
                 self._to_namespaced(FUTURE_JOBS_KEY),
                 self._to_namespaced(NOTIFICATIONS_KEY),
                 job.at_timestamp,
-                job.serialize()
-            ])
+                job.serialize(),
+                job.id,
+                self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+            )
 
     def move_future_jobs(self) -> int:
-        num_jobs_moved = self._move_future_jobs(args=[
+        num_jobs_moved = self._run_script(
+            self._move_future_jobs,
             self.namespace,
             self._to_namespaced(FUTURE_JOBS_KEY),
             self._to_namespaced(NOTIFICATIONS_KEY),
             math.ceil(datetime.now(timezone.utc).timestamp()),
             JobStatus.QUEUED.value
-        ])
+        )
         logger.debug("Redis moved %s job(s) from future to current queues",
                      num_jobs_moved)
         return num_jobs_moved
@@ -76,13 +94,25 @@ class RedisBroker(Broker):
         return Job.deserialize(job[0].decode())
 
     def get_job_from_queue(self, queue: str) -> Optional[Job]:
-        job_json_string = self._r.lpop(self._to_namespaced(queue))
+        job_json_string = self._run_script(
+            self._get_job_from_queue,
+            self._to_namespaced(queue),
+            self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+            JobStatus.RUNNING.value
+        )
         if not job_json_string:
             return None
 
-        job = Job.deserialize(job_json_string.decode())
-        job.status = JobStatus.RUNNING
-        return job
+        return Job.deserialize(job_json_string.decode())
+
+    def _remove_job_from_running(self, job: Job):
+        if job.max_retries == 0:
+            return
+
+        self._r.hdel(
+            self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+            str(job.id)
+        )
 
     def _subscriber_func(self):
         logger.debug('Redis broker subscriber started')
@@ -114,4 +144,4 @@ class RedisBroker(Broker):
         self._must_stop.set()
 
     def flush(self):
-        self._flush(args=[self.namespace])
+        self._run_script(self._flush, self.namespace)

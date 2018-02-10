@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 import threading
 from typing import Optional
+import uuid
 
 from ..job import Job, JobStatus
 from ..const import WAIT_FOR_EVENT_MAX_SECONDS
@@ -16,6 +17,7 @@ class Broker(ABC):
     def __init__(self):
         self._something_happened = threading.Event()
         self._namespace = None
+        self._id = uuid.uuid4()
 
     def wait_for_event(self):
         next_future_job_delta = self.next_future_job_delta
@@ -62,16 +64,25 @@ class Broker(ABC):
         """Notification that a job has been ran (successfully or not)."""
         if not err:
             job.status = JobStatus.SUCCEEDED
-            return self._something_happened.set()
+            self._remove_job_from_running(job)
+            self._something_happened.set()
+            return
 
         if job.should_retry:
             job.retries += 1
             job.at = (
                 datetime.now(timezone.utc) + exponential_backoff(job.retries)
             )
-            return self.enqueue_job(job)
+            self.enqueue_job(job)
+            return
 
         job.status = JobStatus.FAILED
+        self._remove_job_from_running(job)
+        self._something_happened.set()
+
+    @abstractmethod
+    def _remove_job_from_running(self, job: Job):
+        """Remove a job from the list of running ones."""
 
     @abstractmethod
     def get_job_from_queue(self, queue: str):
@@ -99,3 +110,6 @@ class Broker(ABC):
     @abstractmethod
     def flush(self):
         """Delete everything in the namespace."""
+
+    def __repr__(self):
+        return '<{}: {}>'.format(self.__class__.__name__, self._id)

@@ -70,7 +70,8 @@ class Job:
             'queue': self.queue,
             'max_retries': self.max_retries,
             'retries': self.retries,
-            'at': self.at.timestamp(),
+            'at': int(self.at.timestamp()),  # seconds component
+            'at_us': self.at.microsecond,    # microseconds component
             'task_args': self.task_args,
             'task_kwargs': self.task_kwargs
         }, sort_keys=True)
@@ -78,10 +79,12 @@ class Job:
     @classmethod
     def deserialize(cls, job_json_string: str):
         job_dict = json.loads(job_json_string)
+        at = datetime.fromtimestamp(job_dict['at'], tz=timezone.utc)
+        at = at.replace(microsecond=job_dict['at_us'])
         job = Job(
             job_dict['task_name'],
             job_dict['queue'],
-            datetime.fromtimestamp(job_dict['at'], tz=timezone.utc),
+            at,
             job_dict['max_retries'],
             task_args=tuple(job_dict['task_args']),
             task_kwargs=job_dict['task_kwargs'],
@@ -101,6 +104,8 @@ class Job:
             try:
                 if not getattr(self, attr) == getattr(other, attr):
                     return False
+
             except AttributeError:
                 return False
+
         return True

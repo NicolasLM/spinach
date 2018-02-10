@@ -16,6 +16,7 @@ class MemoryBroker(Broker):
         self._lock = threading.RLock()
         self._queues = dict()
         self._future_jobs = list()
+        self._running_jobs = list()
 
     def _get_queue(self, queue_name: str):
         queue_name = self._to_namespaced(queue_name)
@@ -76,3 +77,11 @@ class MemoryBroker(Broker):
         with self._lock:
             self._queues = dict()
             self._future_jobs = list()
+
+    def _remove_job_from_running(self, job: Job):
+        """Remove a job from the list of running ones.
+
+        Easy, the memory broker doesn't track running jobs. If the broker dies
+        there is nothing we can do.
+        """
+        pass

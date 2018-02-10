@@ -107,3 +107,8 @@ def test_job_ran(broker):
     broker.job_ran(job, RuntimeError('Error'))
     assert job.status is JobStatus.WAITING
     assert job.at > now
+
+
+def test_repr(broker):
+    assert broker.__class__.__name__ in repr(broker)
+    assert str(broker._id) in repr(broker)

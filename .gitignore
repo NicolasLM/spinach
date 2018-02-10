@@ -8,3 +8,4 @@ build
 doc/_build
 
 .coverage
+.pytest_cache

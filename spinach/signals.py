@@ -40,7 +40,10 @@ class SafeNamedSignal(blinker.NamedSignal):
                                  'to receiver'.format(self.name))
         return rv
 
+
 job_started = SafeNamedSignal('job_started')
 job_finished = SafeNamedSignal('job_finished')
+job_schedule_retry = SafeNamedSignal('job_schedule_retry')
+job_failed = SafeNamedSignal('job_failed')
 worker_started = SafeNamedSignal('worker_started')
 worker_terminated = SafeNamedSignal('worker_terminated')

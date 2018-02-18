@@ -8,6 +8,7 @@ import uuid
 from ..job import Job, JobStatus
 from ..const import WAIT_FOR_EVENT_MAX_SECONDS
 from ..task import exponential_backoff
+from .. import signals
 
 logger = getLogger('spinach.broker')
 
@@ -62,6 +63,7 @@ class Broker(ABC):
 
     def job_ran(self, job: Job, err: Optional[Exception]):
         """Notification that a job has been ran (successfully or not)."""
+        # Todo: move this code in the arbiter
         if not err:
             job.status = JobStatus.SUCCEEDED
             self._remove_job_from_running(job)
@@ -73,10 +75,12 @@ class Broker(ABC):
             job.at = (
                 datetime.now(timezone.utc) + exponential_backoff(job.retries)
             )
+            signals.job_schedule_retry.send(self._namespace, job=job, err=err)
             self.enqueue_job(job)
             return
 
         job.status = JobStatus.FAILED
+        signals.job_failed.send(self._namespace, job=job, err=err)
         self._remove_job_from_running(job)
         self._something_happened.set()
 

@@ -47,14 +47,20 @@ def test_running_job(mock_eb, broker):
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_job_from_queue('foo_queue')
     job.status = JobStatus.RUNNING
-    assert Job.deserialize(broker._r.hget(running_jobs_key, str(job.id))) == job
+    assert (
+        Job.deserialize(broker._r.hget(running_jobs_key, str(job.id)).decode())
+        == job
+    )
 
     # Idempotent job - re-enqueue after job ran with error
     broker.job_ran(job, err=ZeroDivisionError())
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_job_from_queue('foo_queue')
     job.status = JobStatus.RUNNING
-    assert Job.deserialize(broker._r.hget(running_jobs_key, str(job.id))) == job
+    assert (
+        Job.deserialize(broker._r.hget(running_jobs_key, str(job.id)).decode())
+        == job
+    )
 
     # Idempotent job - job succeeded
     broker.job_ran(job, err=None)
@@ -66,7 +72,10 @@ def test_running_job(mock_eb, broker):
     job.retries = 999
     broker.enqueue_job(job)
     job = broker.get_job_from_queue('foo_queue')
-    assert Job.deserialize(broker._r.hget(running_jobs_key, str(job.id))) == job
+    assert (
+        Job.deserialize(broker._r.hget(running_jobs_key, str(job.id)).decode())
+        == job
+    )
     broker.job_ran(job, err=ZeroDivisionError())
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     assert job.status == JobStatus.FAILED

@@ -12,7 +12,7 @@ install:
 
 script:
     - pytest -v --cov=spinach tests/
-    - pep8 spinach tests
+    - pycodestyle spinach tests
 
 after_success:
   - pip install python-coveralls

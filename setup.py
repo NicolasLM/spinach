@@ -50,7 +50,7 @@ setup(
             'pytest',
             'pytest-cov',
             'pytest-threadleak',
-            'pep8'
+            'pycodestyle'
         ],
     },
 

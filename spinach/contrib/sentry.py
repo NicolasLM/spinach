@@ -21,7 +21,7 @@ def register_sentry(raven_client, namespace: Optional[str]=None):
 
     @signals.job_finished.connect_via(namespace)
     def job_finished(*args, job=None, **kwargs):
-        raven_client.transaction.push(job.task_name)
+        raven_client.transaction.pop(job.task_name)
         raven_client.context.clear()
 
     @signals.job_failed.connect_via(namespace)

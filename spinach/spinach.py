@@ -4,11 +4,12 @@ import threading
 import time
 from typing import Optional
 
-from .task import Task, Tasks
+from .task import Task, Tasks, exponential_backoff
 from .job import Job, JobStatus
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE
 from .worker import Workers
+from . import signals
 
 
 logger = getLogger(__name__)
@@ -131,5 +132,21 @@ class Spinach:
 
     def _job_finished_callback(self, job: Job, err: Optional[Exception]):
         """Function called by a worker when a job is finished."""
-        assert job.status is JobStatus.RUNNING
-        self._broker.job_ran(job, err)
+        if not err:
+            job.status = JobStatus.SUCCEEDED
+            self._broker.remove_job_from_running(job)
+            return
+
+        if job.should_retry:
+            job.retries += 1
+            job.at = (
+                datetime.now(timezone.utc) + exponential_backoff(job.retries)
+            )
+            signals.job_schedule_retry.send(self._namespace, job=job, err=err)
+            self._broker.enqueue_job(job)
+            # No need to remove job from running, enqueue does it
+            return
+
+        job.status = JobStatus.FAILED
+        signals.job_failed.send(self._namespace, job=job, err=err)
+        self._broker.remove_job_from_running(job)

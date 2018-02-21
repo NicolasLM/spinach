@@ -105,14 +105,13 @@ class RedisBroker(Broker):
 
         return Job.deserialize(job_json_string.decode())
 
-    def _remove_job_from_running(self, job: Job):
-        if job.max_retries == 0:
-            return
-
-        self._r.hdel(
-            self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
-            str(job.id)
-        )
+    def remove_job_from_running(self, job: Job):
+        if job.max_retries > 0:
+            self._r.hdel(
+                self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+                str(job.id)
+            )
+        self._something_happened.set()
 
     def _subscriber_func(self):
         logger.debug('Redis broker subscriber started')
@@ -126,7 +125,7 @@ class RedisBroker(Broker):
 
             # Consume all messages
             while pub_sub.get_message(timeout=0):
-                pass
+                pass  # noqa
 
             logger.debug('Got a message from channel %s', channel_name)
             self._something_happened.set()

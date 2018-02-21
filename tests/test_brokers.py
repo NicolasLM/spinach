@@ -89,26 +89,6 @@ def test_flush(broker):
     assert broker.next_future_job_delta is None
 
 
-def test_job_ran(broker):
-    now = datetime.now(timezone.utc)
-    job = Job('foo_task', 'foo_queue', now, 0,
-              task_args=(1, 2), task_kwargs={'foo': 'bar'})
-
-    job.status = JobStatus.RUNNING
-    broker.job_ran(job, None)
-    assert job.status is JobStatus.SUCCEEDED
-
-    job.status = JobStatus.RUNNING
-    broker.job_ran(job, RuntimeError('Error'))
-    assert job.status is JobStatus.FAILED
-
-    job.status = JobStatus.RUNNING
-    job.max_retries = 10
-    broker.job_ran(job, RuntimeError('Error'))
-    assert job.status is JobStatus.WAITING
-    assert job.at > now
-
-
 def test_repr(broker):
     assert broker.__class__.__name__ in repr(broker)
     assert str(broker._id) in repr(broker)

@@ -27,9 +27,7 @@ def test_redis_flush(broker):
     broker._r.delete('tests2/foo')
 
 
-@patch('spinach.brokers.base.exponential_backoff')
-def test_running_job(mock_eb, broker):
-    mock_eb.return_value = timedelta()
+def test_running_job(broker):
     running_jobs_key = broker._to_namespaced(
         RUNNING_JOBS_KEY.format(broker._id)
     )
@@ -40,6 +38,8 @@ def test_running_job(mock_eb, broker):
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_job_from_queue('foo_queue')
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
+    # Try to remove it, even if it doesn't exist in running
+    broker.remove_job_from_running(job)
 
     # Idempotent job - get from queue
     job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 10)
@@ -53,7 +53,8 @@ def test_running_job(mock_eb, broker):
     )
 
     # Idempotent job - re-enqueue after job ran with error
-    broker.job_ran(job, err=ZeroDivisionError())
+    job.retries += 1
+    broker.enqueue_job(job)
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_job_from_queue('foo_queue')
     job.status = JobStatus.RUNNING
@@ -63,19 +64,6 @@ def test_running_job(mock_eb, broker):
     )
 
     # Idempotent job - job succeeded
-    broker.job_ran(job, err=None)
+    broker.remove_job_from_running(job)
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     assert broker.get_job_from_queue('foo_queue') is None
-
-    # Idempotent job - job failed
-    job.status = JobStatus.NOT_SET
-    job.retries = 999
-    broker.enqueue_job(job)
-    job = broker.get_job_from_queue('foo_queue')
-    assert (
-        Job.deserialize(broker._r.hget(running_jobs_key, str(job.id)).decode())
-        == job
-    )
-    broker.job_ran(job, err=ZeroDivisionError())
-    assert broker._r.hget(running_jobs_key, str(job.id)) is None
-    assert job.status == JobStatus.FAILED

@@ -1,4 +1,3 @@
-import copy
 from logging import getLogger
 
 import blinker
@@ -15,9 +14,8 @@ class SafeNamedSignal(blinker.NamedSignal):
     def send(self, *sender, **kwargs):
         """Emit this signal on behalf of `sender`, passing on kwargs.
 
-        This is an extension of `Signal.send` that adds two things:
-        - Exceptions raised in calling the receiver are logged but do not fail
-        - kwargs passed to receivers are deep-copied to avoid safety issues
+        This is an extension of `Signal.send` that changes one thing:
+        Exceptions raised in calling the receiver are logged but do not fail
         """
         if len(sender) == 0:
             sender = None
@@ -33,8 +31,7 @@ class SafeNamedSignal(blinker.NamedSignal):
         rv = list()
         for receiver in self.receivers_for(sender):
             try:
-                receiver_kwargs = copy.deepcopy(kwargs)
-                rv.append((receiver, receiver(sender, **receiver_kwargs)))
+                rv.append((receiver, receiver(sender, **kwargs)))
             except Exception:
                 logger.exception('Error while dispatching signal "{}" '
                                  'to receiver'.format(self.name))

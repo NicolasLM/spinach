@@ -12,7 +12,7 @@ composable and reusable way.
 Subscribing to signals
 ----------------------
 
-Subscribing to a signal is done via its :pyfunc:`connect` decorator::
+Subscribing to a signal is done via its ``connect`` decorator::
 
     from spinach import signals
 
@@ -27,8 +27,8 @@ Subscribing to signals of a specific Spinach
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 As your application gets bigger you may end up running multiple ``Spinach`` in
-the same interpreter. The :pyfunc:`connect_via` decorator allows to
-subscribe to the signals sent by a specific ``Spinach``::
+the same interpreter. The ``connect_via`` decorator allows to subscribe to the
+signals sent by a specific ``Spinach``::
 
     from spinach import Spinach, MemoryBroker, signals
 
@@ -52,8 +52,8 @@ Tips
 Received objects
 ~~~~~~~~~~~~~~~~
 
-Objects given to your receiving function are always copies. Modifying these
-objects have no impact on the operations.
+Objects received via signals should not be modified in handlers as it could
+break something in Spinach internals.
 
 Exceptions
 ~~~~~~~~~~

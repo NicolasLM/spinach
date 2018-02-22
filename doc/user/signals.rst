@@ -44,7 +44,12 @@ In this example only signals sent by the `foo` ``Spinach`` will be received.
 Available signals
 -----------------
 
-.. todo:: Add the documentation of individual signals here
+.. autodata:: spinach.signals.job_started
+.. autodata:: spinach.signals.job_finished
+.. autodata:: spinach.signals.job_schedule_retry
+.. autodata:: spinach.signals.job_failed
+.. autodata:: spinach.signals.worker_started
+.. autodata:: spinach.signals.worker_terminated
 
 Tips
 ----

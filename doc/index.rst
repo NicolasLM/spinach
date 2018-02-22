@@ -23,6 +23,7 @@ Getting started with spinach:
    :maxdepth: 1
 
    user/install
+   user/tasks
    user/integrations
    user/signals
    user/design

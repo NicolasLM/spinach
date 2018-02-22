@@ -33,11 +33,13 @@ class Task:
 
 
 class Tasks:
-    """Hold some tasks to be used by Spinach.
+    """Registry for tasks to be used by Spinach.
 
-    This class is not thread-safe because it doesn't need to be used
-    concurrently.
+    :arg queue: default queue for tasks
+    :arg max_retries: default retry policy for tasks
     """
+    # This class is not thread-safe because it doesn't need to be used
+    # concurrently.
 
     def __init__(self, queue: Optional[str]=None,
                  max_retries: Optional[Number]=None):
@@ -52,6 +54,18 @@ class Tasks:
 
     def task(self, func: Optional[Callable]=None, name: Optional[str]=None,
              queue: Optional[str]=None, max_retries: Optional[Number]=None):
+        """Decorator to register a task function.
+
+        :arg name: name of the task, used later to schedule jobs
+        :arg queue: queue of the task, the default is used if not provided
+        :arg max_retries: maximum number of retries, the default is used if
+             not provided
+
+        >>> tasks = Tasks()
+        >>> @tasks.task(name='foo')
+        >>> def foo():
+        ...    pass
+        """
 
         if func is None:
             return functools.partial(self.task, name=name, queue=queue,
@@ -67,6 +81,17 @@ class Tasks:
 
     def add(self, func: Callable, name: Optional[str]=None,
             queue: Optional[str]=None, max_retries: Optional[Number]=None):
+        """Register a task function.
+
+        :arg func: a callable to be executed
+        :arg name: name of the task, used later to schedule jobs
+        :arg queue: queue of the task, the default is used if not provided
+        :arg max_retries: maximum number of retries, the default is used if
+             not provided
+
+        >>> tasks = Tasks()
+        >>> tasks.add(lambda x: x, name='do_nothing')
+        """
         if not name:
             raise ValueError('Each Spinach task needs a name')
         if name in self._tasks:
@@ -98,10 +123,30 @@ class Tasks:
             )
 
     def schedule(self, task_name: str, *args, **kwargs):
+        """Schedule a job.
+
+        :arg task_name: name of the task to execute in the background
+        :arg args: args to be passed to the task function
+        :arg kwargs: kwargs to be passed to the task function
+
+        This method can only be used once tasks have been attached to a
+        :class:`Spinach` instance.
+        """
         self._require_attached_tasks()
         self._spin.schedule(task_name, *args, **kwargs)
 
     def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
+        """Schedule a job in the future
+
+        :arg task_name: name of the task to execute in the background
+        :arg at: datetime instance representing the date at which the job
+             should start
+        :arg args: args to be passed to the task function
+        :arg kwargs: kwargs to be passed to the task function
+
+        This method can only be used once tasks have been attached to a
+        :class:`Spinach` instance.
+        """
         self._require_attached_tasks()
         self._spin.schedule_at(task_name, at, *args, **kwargs)
 

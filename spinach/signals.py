@@ -4,8 +4,10 @@ import blinker
 
 logger = getLogger(__name__)
 
-__all__ = ['job_started', 'job_finished', 'worker_started',
-           'worker_terminated']
+__all__ = [
+    'job_started', 'job_finished', 'job_schedule_retry', 'job_failed',
+    'worker_started', 'worker_terminated'
+]
 
 
 class SafeNamedSignal(blinker.NamedSignal):
@@ -37,10 +39,68 @@ class SafeNamedSignal(blinker.NamedSignal):
                                  'to receiver'.format(self.name))
         return rv
 
+    def __repr__(self):
+        return 'SafeNamedSignal "{}"'.format(self.name)
 
-job_started = SafeNamedSignal('job_started')
-job_finished = SafeNamedSignal('job_finished')
-job_schedule_retry = SafeNamedSignal('job_schedule_retry')
-job_failed = SafeNamedSignal('job_failed')
-worker_started = SafeNamedSignal('worker_started')
-worker_terminated = SafeNamedSignal('worker_terminated')
+
+# Added signals but also be documented in doc/user/signals.rst
+job_started = SafeNamedSignal('job_started', doc='''\
+Sent by a worker when a job starts being executed.
+
+Signal handlers receive:
+
+- `namespace` Spinach namespace
+- `job` :class:`Job` being executed
+''')
+
+job_finished = SafeNamedSignal('job_finished', doc='''\
+Sent by a worker when a job finishes execution.
+
+The signal is sent no matter the outcome, even if the job fails or gets
+rescheduled for retry.
+
+Signal handlers receive:
+
+- `namespace` Spinach namespace
+- `job` :class:`Job` being executed
+''')
+
+job_schedule_retry = SafeNamedSignal('job_schedule_retry', doc='''\
+Sent by a worker when a job gets rescheduled for retry.
+
+Signal handlers receive:
+
+- `namespace` Spinach namespace
+- `job` :class:`Job` being executed
+- `err` exception that made the job retry
+''')
+
+job_failed = SafeNamedSignal('job_failed', doc='''\
+Sent by a worker when a job failed.
+
+A failed job will not be retried.
+
+Signal handlers receive:
+
+- `namespace` Spinach namespace
+- `job` :class:`Job` being executed
+- `err` exception that made the job fail
+''')
+
+worker_started = SafeNamedSignal('worker_started', doc='''\
+Sent by a worker when it starts.
+
+Signal handlers receive:
+
+- `namespace` Spinach namespace
+- `worker_name` name of the worker starting
+''')
+
+worker_terminated = SafeNamedSignal('worker_terminated', doc='''\
+Sent by a worker when it shutdowns.
+
+Signal handlers receive:
+
+- `namespace` Spinach namespace
+- `worker_name` name of the worker shutting down
+''')

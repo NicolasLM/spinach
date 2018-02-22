@@ -1,7 +1,33 @@
 .. _integrations:
 
+Integrations
+============
+
+Integration with third-party libraries and frameworks.
+
+Logging
+-------
+
+Spinach uses the standard Python `logging package
+<https://docs.python.org/3/library/logging.html>`_. Its logger prefix is
+``spinach``. Spinach does nothing else besides creating its loggers and
+emitting log records. The user is responsible for configuring logging before
+starting workers.
+
+For simple applications it is enough to use::
+
+    import logging
+
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s: %(message)s',
+        level=logging.DEBUG
+    )
+
+More complex applications will probably use `dictConfig
+<https://docs.python.org/3/library/logging.config.html>`_.
+
 Sentry
-======
+------
 
 With the Sentry integration, failing jobs can be automatically reported to
 `Sentry <https://sentry.io>`_ with full traceback, log breadcrumbs and job

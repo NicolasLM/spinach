@@ -1,12 +1,7 @@
 .. _faq:
 
-Frequently Asked Questions
-==========================
-
-What is the licence?
---------------------
-
-Spinach is released under the :download:`BSD license <../../LICENSE>`.
+FAQ
+===
 
 Should I use Spinach?
 ---------------------
@@ -34,3 +29,9 @@ Writing this init system yourself in Python using the multiprocessing module
 is possible but it must not import your actual application using Spinach. This
 is because mixing threads and forks in a single interpreter is a minefield.
 Anyway you are probably better off using a battle tested init system.
+
+What is the licence?
+--------------------
+
+Spinach is released under the :download:`BSD license <../../LICENSE>`.
+

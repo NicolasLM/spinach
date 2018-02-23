@@ -129,6 +129,7 @@ html_theme_options = {
     'description': 'Modern Redis task queue for Python 3',
     'github_user': 'NicolasLM',
     'github_repo': 'spinach',
+    'github_type': 'star',
     'github_button': True
 }
 

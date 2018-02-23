@@ -22,8 +22,8 @@ class JobStatus(enum.Enum):
         - if the job terminates without error it is set to `SUCCEEDED`
         - if the job terminates with an error and can be retried it is set to
           `WAITING` until it is ready to be queued again
-        - if the job terminates with an error and cannot be retried it is set to
-          `FAILED` for ever
+        - if the job terminates with an error and cannot be retried it is set
+          to `FAILED` for ever
 
     See :doc:`signals` to be notified on some of these status transitions.
     """

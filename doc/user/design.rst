@@ -96,6 +96,9 @@ One annoying thing with Celery is that you can launch as many distributed
 workers as you want but there must be one and only one Celery beat process
 running in the cluster at a time.
 
+This approach does not work well with containerized applications that run in a
+cluster that often redeploys and move containers around.
+
 All Spinach workers are part of the system that schedules periodic jobs, there
 is no need to have a pet in the cattle farm.
 
@@ -124,6 +127,20 @@ database without interfering with each other.
 
 Likewise, a single interpreter can run multiple Spinach applications without
 them interfering with each other.
+
+Minimize import side-effects
+----------------------------
+
+Spinach encourages users to write applications that have minimal side-effects
+when imported. There is no global state that gets created or modified when
+importing or using Spinach.
+
+The user is free to use Spinach in a scoped fashion or declaring everything
+globally.
+
+This makes it possible for a single interpreter to run multiple Spinach
+applications without them interfering with each other, which is particularly
+useful for running automated tests.
 
 No worker entrypoint
 --------------------

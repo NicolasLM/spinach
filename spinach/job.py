@@ -10,16 +10,50 @@ logger = getLogger(__name__)
 
 
 class JobStatus(enum.Enum):
+    """Possible status of a :class:`Job`.
 
-    NOT_SET = 0      # Job didn't even hit broker yet
-    WAITING = 1      # Job is scheduled to start in the future
-    QUEUED = 2       # Job is in a queue, ready to be picked by a worker
-    RUNNING = 3      # Job is being executed
-    SUCCEEDED = 4    # Job is finished, everything went well
-    FAILED = 5       # Job failed for good
+    Life-cycle:
+
+    - Newly created jobs first get the status `NOT_SET`
+    - Future jobs are then set to `WAITING` until they are ready to be `QUEUED`
+    - Jobs starting immediately get the status `QUEUED` directly when they are
+      received by the broker
+    - Jobs are set to `RUNNING` when a worker start their execution
+        - if the job terminates without error it is set to `SUCCEEDED`
+        - if the job terminates with an error and can be retried it is set to
+          `WAITING` until it is ready to be queued again
+        - if the job terminates with an error and cannot be retried it is set to
+          `FAILED` for ever
+
+    See :doc:`signals` to be notified on some of these status transitions.
+    """
+
+    NOT_SET = 0     #: Job created but not scheduled yet
+    WAITING = 1     #: Job is scheduled to start in the future
+    QUEUED = 2      #: Job is in a queue, ready to be picked by a worker
+    RUNNING = 3     #: Job is being executed
+    SUCCEEDED = 4   #: Job is finished, execution was successful
+    FAILED = 5      #: Job failed and will not be retried
 
 
 class Job:
+    """Represent the execution of a :class:`Task` by background workers.
+
+    The :class:`Job` class should not be instantiated by the user, instead jobs
+    are automatically created when they are scheduled.
+
+    :ivar id: UUID of the job
+    :ivar status: :class:`JobStatus`
+    :ivar task_name: string name of the task
+    :ivar queue: string name of the queue
+    :ivar at: timezone aware `datetime` representing the date at which the job
+          should start
+    :ivar max_retries: int representing how many times a failing job should be
+          retried
+    :ivar retries: int representing how many times the job was already executed
+    :ivar task_args: optional tuple containing args passed to the task
+    :ivar task_kwargs: optional dict containing kwargs passed to the task
+    """
 
     __slots__ = ['id', 'status', 'task_name', 'queue', 'at', 'max_retries',
                  'retries', 'task_args', 'task_kwargs', 'task_func']

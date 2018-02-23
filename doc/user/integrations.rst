@@ -19,7 +19,7 @@ For simple applications it is enough to use::
     import logging
 
     logging.basicConfig(
-        format='%(asctime)s - %(levelname)s: %(message)s',
+        format='%(asctime)s - %(threadName)s %(levelname)s: %(message)s',
         level=logging.DEBUG
     )
 

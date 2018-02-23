@@ -16,6 +16,8 @@ To define a task::
     def add(a, b):
         print('Computed {} + {} = {}'.format(a, b, a + b))
 
+.. note:: The `args` and `kwargs` of a task must be JSON serializable.
+
 Retries and Idempotency
 -----------------------
 

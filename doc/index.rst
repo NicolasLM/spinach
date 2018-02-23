@@ -17,22 +17,29 @@ Installation::
 
    pip install spinach
 
+Quickstart
+
+.. literalinclude:: ../examples/quickstart.py
+
 Getting started with spinach:
 
 .. toctree::
-   :maxdepth: 1
+    :maxdepth: 1
 
-   user/install
-   user/tasks
-   user/integrations
-   user/signals
-   user/design
-   user/faq
+    user/install
+    user/tasks
+    user/jobs
+    user/queues
+    user/integrations
+    user/signals
+    user/production
+    user/design
+    user/faq
 
 Hacking guide:
 
 .. toctree::
-   :maxdepth: 1
+    :maxdepth: 1
 
-   hacking/contributing
-   hacking/internals
+    hacking/contributing
+    hacking/internals

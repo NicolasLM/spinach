@@ -10,7 +10,7 @@ from .job import Job, JobStatus
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE
 from .worker import Workers
-from . import signals
+from . import signals, exc
 
 
 logger = getLogger(__name__)
@@ -55,13 +55,14 @@ class Engine:
         tasks._spin = self
 
     def _get_task(self, name) -> Task:
-        try:
-            return self._tasks[name]
-        except KeyError:
-            raise ValueError(
-                'Unknown task "{}". Known tasks: {}'
-                .format(name, list(self._tasks.keys()))
-            )
+        task = self._tasks.get(name)
+        if task is not None:
+            return task
+
+        raise exc.UnknownTask(
+            'Unknown task "{}", known tasks: {}'
+            .format(name, list(self._tasks.keys()))
+        )
 
     def execute(self, task_name: str, *args, **kwargs):
         return self._get_task(task_name).func(*args, **kwargs)
@@ -102,8 +103,12 @@ class Engine:
                 job = self._broker.get_job_from_queue(self._working_queue)
 
                 while job:
-                    job.task_func = self._get_task(job.task_name).func
-                    self._workers.submit_job(job)
+                    try:
+                        job.task_func = self._get_task(job.task_name).func
+                    except exc.UnknownTask as err:
+                        self._job_finished_callback(job, 0.0, err)
+                    else:
+                        self._workers.submit_job(job)
 
                     if self._workers.can_accept_job():
                         job = self._broker.get_job_from_queue(

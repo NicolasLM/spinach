@@ -1,9 +1,12 @@
 from datetime import datetime, timezone
+from unittest.mock import patch
+import time
 
 import pytest
 
 from spinach import Engine, MemoryBroker, RetryException
 from spinach.job import Job, JobStatus
+from spinach.exc import UnknownTask
 
 
 @pytest.fixture
@@ -43,3 +46,8 @@ def test_job_finished_callback(spin):
     job.max_retries = 0
     spin._job_finished_callback(job, 1.0, RetryException('Must retry', at=now))
     assert job.status is JobStatus.FAILED
+
+
+def test_schedule_unknown_task(spin):
+    with pytest.raises(UnknownTask):
+        spin.schedule('foo_task')

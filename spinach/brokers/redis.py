@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 import math
 from os import path
+import socket
 import threading
 from typing import Optional
 
@@ -11,6 +12,8 @@ from redis.client import Script
 from ..brokers.base import Broker
 from ..job import Job, JobStatus
 from ..const import FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY
+from ..utils import run_forever
+
 
 logger = getLogger('spinach.broker')
 here = path.abspath(path.dirname(__file__))
@@ -26,7 +29,7 @@ class RedisBroker(Broker):
 
     def __init__(self, redis: Optional[StrictRedis]=None):
         super().__init__()
-        self._r = redis if redis else StrictRedis()
+        self._r = redis if redis else StrictRedis(**recommended_socket_opts)
 
         # Register the lua scripts
         self._move_future_jobs = self._load_script('move_future_jobs.lua')
@@ -133,7 +136,8 @@ class RedisBroker(Broker):
 
     def start(self):
         self._subscriber_thread = threading.Thread(
-            target=self._subscriber_func,
+            target=run_forever,
+            args=(self._subscriber_func, self._must_stop, logger),
             name='{}-broker-subscriber'.format(self.namespace)
         )
         self._subscriber_thread.start()
@@ -144,3 +148,21 @@ class RedisBroker(Broker):
 
     def flush(self):
         self._run_script(self._flush, self.namespace)
+
+
+recommended_socket_opts = {
+    'socket_timeout': 60,
+    'socket_connect_timeout': 15
+}
+try:
+    # These are the values used by Redis itself by default
+    recommended_socket_opts['socket_keepalive_options'] = {
+        socket.TCP_KEEPIDLE: 300,   # Send probes after 300s of inactivity
+        socket.TCP_KEEPINTVL: 100,  # Send probes every 100s
+        socket.TCP_KEEPCNT: 3       # Send 3 probes before closing
+    }
+    recommended_socket_opts['socket_keepalive'] = True
+except AttributeError:
+    # Some non-Linux OS do not have the proper attribute in the socket module
+    # for TCP Keepalive
+    pass  # noqa

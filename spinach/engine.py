@@ -5,7 +5,7 @@ import time
 from typing import Optional
 
 from .task import Task, Tasks, RetryException, exponential_backoff
-from .utils import human_duration
+from .utils import human_duration, run_forever
 from .job import Job, JobStatus
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE
@@ -142,7 +142,8 @@ class Engine:
 
         # Start the arbiter
         self._arbiter = threading.Thread(
-            target=self._arbiter_func,
+            target=run_forever,
+            args=(self._arbiter_func, self._must_stop, logger),
             name='{}-arbiter'.format(self.namespace)
         )
         self._arbiter.start()

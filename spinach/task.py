@@ -165,3 +165,21 @@ def exponential_backoff(attempt: int) -> timedelta:
 
     temp = min(base * 2 ** attempt, cap)
     return timedelta(seconds=temp / 2 + random.randint(0, temp / 2))
+
+
+class RetryException(Exception):
+    """Exception raised in a task to indicate that the job should be retried.
+
+    Even if this exception is raised, the `max_retries` defined in the task
+    still applies.
+
+    :arg at: Optional date at which the job should be retried. If it is not
+         given the job will be retried after a randomized exponential backoff.
+         It is advised to pass a timezone aware datetime to lift any
+         ambiguity. However if a timezone naive datetime if given, it will
+         be assumed to contain UTC time.
+    """
+
+    def __init__(self, message, at: Optional[datetime]=None):
+        super().__init__(message)
+        self.at = at

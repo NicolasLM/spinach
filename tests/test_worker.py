@@ -71,12 +71,15 @@ def test_job_execution(workers, job):
 
     # Executed function raised no error
     task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
-    callback.assert_called_once_with(job, None)
+    callback.assert_called_once_with(job, ANY, None)
     assert workers.can_accept_job()
 
+
+def test_job_execution_exception(workers, job):
+    workers, callback = workers
+    job, task_func = job
+
     # Executed function raised an error
-    callback.reset_mock()
-    task_func.reset_mock()
     error = RuntimeError('Error')
     task_func.side_effect = error
 
@@ -84,7 +87,7 @@ def test_job_execution(workers, job):
     wait_for_queue_empty(workers)
 
     task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
-    callback.assert_called_once_with(job, error)
+    callback.assert_called_once_with(job, ANY, error)
 
 
 def test_submit_job_shutdown_workers(workers, job):

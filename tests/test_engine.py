@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from spinach import Engine, MemoryBroker
+from spinach import Engine, MemoryBroker, RetryException
 from spinach.job import Job, JobStatus
 
 
@@ -20,15 +20,26 @@ def test_job_finished_callback(spin):
               task_args=(1, 2), task_kwargs={'foo': 'bar'})
 
     job.status = JobStatus.RUNNING
-    spin._job_finished_callback(job, None)
+    spin._job_finished_callback(job, 1.0, None)
     assert job.status is JobStatus.SUCCEEDED
 
     job.status = JobStatus.RUNNING
-    spin._job_finished_callback(job, RuntimeError('Error'))
+    spin._job_finished_callback(job, 1.0, RuntimeError('Error'))
     assert job.status is JobStatus.FAILED
 
     job.status = JobStatus.RUNNING
     job.max_retries = 10
-    spin._job_finished_callback(job, RuntimeError('Error'))
+    spin._job_finished_callback(job, 1.0, RuntimeError('Error'))
     assert job.status is JobStatus.WAITING
     assert job.at > now
+
+    job.status = JobStatus.RUNNING
+    job.max_retries = 10
+    spin._job_finished_callback(job, 1.0, RetryException('Must retry', at=now))
+    assert job.status is JobStatus.QUEUED
+    assert job.at == now
+
+    job.status = JobStatus.RUNNING
+    job.max_retries = 0
+    spin._job_finished_callback(job, 1.0, RetryException('Must retry', at=now))
+    assert job.status is JobStatus.FAILED

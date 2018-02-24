@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-from spinach.task import Task, Tasks, exponential_backoff
+from spinach.task import Task, Tasks, RetryException, exponential_backoff
 from spinach import const
 
 from .conftest import get_now
@@ -137,3 +137,13 @@ def test_exponential_backoff():
         timedelta(seconds=3) <= exponential_backoff(1) <= timedelta(seconds=6)
     )
     assert exponential_backoff(10000) <= timedelta(minutes=20)
+
+
+def test_retry_exception():
+    r = RetryException('Foo')
+    assert str(r) == 'Foo'
+    assert r.at is None
+
+    r = RetryException('Bar', get_now())
+    assert str(r) == 'Bar'
+    assert r.at is get_now()

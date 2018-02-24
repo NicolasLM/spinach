@@ -4,7 +4,8 @@ import threading
 import time
 from typing import Optional
 
-from .task import Task, Tasks, exponential_backoff
+from .task import Task, Tasks, RetryException, exponential_backoff
+from .utils import human_duration
 from .job import Job, JobStatus
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE
@@ -159,23 +160,47 @@ class Engine:
         self._workers.stop()
         self._broker.stop()
 
-    def _job_finished_callback(self, job: Job, err: Optional[Exception]):
+    def _job_finished_callback(self, job: Job, duration: float,
+                               err: Optional[Exception]):
         """Function called by a worker when a job is finished."""
+        duration = human_duration(duration)
         if not err:
             job.status = JobStatus.SUCCEEDED
+            logger.info('Finished execution of %s in %s', job, duration)
             self._broker.remove_job_from_running(job)
             return
 
         if job.should_retry:
             job.retries += 1
-            job.at = (
-                datetime.now(timezone.utc) + exponential_backoff(job.retries)
-            )
+            if isinstance(err, RetryException) and err.at is not None:
+                job.at = err.at
+            else:
+                job.at = (datetime.now(timezone.utc) +
+                          exponential_backoff(job.retries))
+
             signals.job_schedule_retry.send(self._namespace, job=job, err=err)
-            self._broker.enqueue_job(job)
             # No need to remove job from running, enqueue does it
+            self._broker.enqueue_job(job)
+
+            log_args = (
+                job.retries, job.max_retries + 1, job, duration,
+                human_duration(
+                    (job.at - datetime.now(tz=timezone.utc)).total_seconds()
+                )
+            )
+            if isinstance(err, RetryException):
+                logger.info('Retry requested during execution %d/%d of %s '
+                            'after %s, retry in %s', *log_args)
+            else:
+                logger.warning('Error during execution %d/%d of %s after %s, '
+                               'retry in %s', *log_args)
+
             return
 
         job.status = JobStatus.FAILED
         signals.job_failed.send(self._namespace, job=job, err=err)
+        logger.exception(
+            'Error during execution %d/%d of %s after %s',
+            job.max_retries + 1, job.max_retries + 1, job, duration
+        )
         self._broker.remove_job_from_running(job)

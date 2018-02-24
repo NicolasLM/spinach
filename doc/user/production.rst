@@ -42,13 +42,15 @@ Spinach:
   number
 - Retries happen after an exponential delay with randomized jitter (the
   default)
-- Task `args` and `kwargs` are JSON serializable
+- Task `args` and `kwargs` are JSON serializable and small in size
 - The user's code is thread-safe
 - Tasks do not store state in the process between invocations
-- Configure logging and send exceptions to Sentry, see :doc:`integrations`
-- Use different queues if tasks have different usage pattens, see :doc:`queues`
-- Use different namespaces if multiple Spinach applications share the same
-  Redis, see :doc:`engine`
+- Logging is configured and exceptions are sent to Sentry, see
+  :doc:`integrations`
+- Different queues are used if tasks have different usage pattens, see
+  :doc:`queues`
+- Different namespaces are used if multiple Spinach applications share the same
+  Redis server, see :doc:`engine`
 
 Redis:
 

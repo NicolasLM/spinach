@@ -20,5 +20,5 @@ workers to executing only tasks of this particular queue.
 .. note:: By default all tasks and all workers use the ``spinach`` queue
 
 .. note:: Namespaces and queues are different concepts. While queues share the
-          same Spinach application, namespaces make two Spinach applications
+          same Spinach :class:`Engine`, namespaces make two Spinach Engines
           invisible to each other while still using the same broker.

@@ -33,7 +33,7 @@ Create task and schedule two jobs, one executed now and one later:
 
     from datetime import datetime, timedelta, timezone
 
-    from spinach import Tasks, MemoryBroker, Spinach
+    from spinach import Engine, Tasks, MemoryBroker
 
     tasks = Tasks()
 
@@ -43,7 +43,7 @@ Create task and schedule two jobs, one executed now and one later:
         print('Computed {} + {} = {}'.format(a, b, a + b))
 
 
-    spin = Spinach(MemoryBroker())
+    spin = Engine(MemoryBroker())
     spin.attach_tasks(tasks)
 
     # Schedule a job to be executed ASAP

@@ -29,6 +29,7 @@ Getting started with spinach:
     user/install
     user/tasks
     user/jobs
+    user/engine
     user/queues
     user/integrations
     user/signals

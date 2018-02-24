@@ -21,25 +21,26 @@ Subscribing to a signal is done via its ``connect`` decorator::
         print('Job {} started'.format(job))
 
 The first argument given to your function is always the namespace of your
-Spinach, the following arguments depend on the signal itself.
+Spinach :class:`Engine`, the following arguments depend on the signal itself.
 
-Subscribing to signals of a specific Spinach
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Subscribing to signals of a specific Spinach Engine
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-As your application gets bigger you may end up running multiple ``Spinach`` in
+As your application gets bigger you may end up running multiple Engines in
 the same interpreter. The ``connect_via`` decorator allows to subscribe to the
-signals sent by a specific ``Spinach``::
+signals sent by a specific Spinach :class:`Engine`::
 
-    from spinach import Spinach, MemoryBroker, signals
+    from spinach import Engine, MemoryBroker, signals
 
-    foo_spin = Spinach(MemoryBroker(), namespace='foo')
-    bar_spin = Spinach(MemoryBroker(), namespace='bar')
+    foo_spin = Engine(MemoryBroker(), namespace='foo')
+    bar_spin = Engine(MemoryBroker(), namespace='bar')
 
     @signals.job_started.connect_via(foo_spin.namespace)
     def job_started(namespace, job, **kwargs):
         print('Job {} started on Foo'.format(job))
 
-In this example only signals sent by the `foo` ``Spinach`` will be received.
+In this example only signals sent by the `foo` :class:`Engine` will be
+received.
 
 Available signals
 -----------------

@@ -1,7 +1,7 @@
 import time
 import logging
 
-from spinach import Spinach, Tasks, MemoryBroker
+from spinach import Engine, Tasks, MemoryBroker
 
 
 logging.basicConfig(
@@ -21,7 +21,7 @@ def slow():
     time.sleep(10)
 
 
-spin = Spinach(MemoryBroker())
+spin = Engine(MemoryBroker())
 spin.attach_tasks(tasks)
 
 tasks.schedule('slow')

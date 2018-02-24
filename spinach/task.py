@@ -119,7 +119,7 @@ class Tasks:
         if self._spin is None:
             raise RuntimeError(
                 'Cannot execute tasks until the tasks have been attached to '
-                'a Spinach instance.'
+                'a Spinach Engine.'
             )
 
     def schedule(self, task_name: str, *args, **kwargs):
@@ -130,7 +130,7 @@ class Tasks:
         :arg kwargs: kwargs to be passed to the task function
 
         This method can only be used once tasks have been attached to a
-        :class:`Spinach` instance.
+        Spinach :class:`Engine`.
         """
         self._require_attached_tasks()
         self._spin.schedule(task_name, *args, **kwargs)
@@ -139,13 +139,15 @@ class Tasks:
         """Schedule a job in the future
 
         :arg task_name: name of the task to execute in the background
-        :arg at: datetime instance representing the date at which the job
-             should start
+        :arg at: Date at which the job should start. It is advised to pass a
+                 timezone aware datetime to lift any ambiguity. However if a
+                 timezone naive datetime if given, it will be assumed to
+                 contain UTC time.
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
 
         This method can only be used once tasks have been attached to a
-        :class:`Spinach` instance.
+        Spinach :class:`Engine`.
         """
         self._require_attached_tasks()
         self._spin.schedule_at(task_name, at, *args, **kwargs)

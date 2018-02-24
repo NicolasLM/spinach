@@ -11,7 +11,7 @@ def register_sentry(raven_client, namespace: Optional[str]=None):
 
     :param raven_client: configured Raven client used to sent errors to Sentry
     :param namespace: optionally only register the Sentry integration for a
-                      particular Spinach instance.
+                      particular Spinach :class:`Engine`.
     """
 
     @signals.job_started.connect_via(namespace)

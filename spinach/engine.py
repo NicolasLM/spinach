@@ -15,7 +15,14 @@ from . import signals
 logger = getLogger(__name__)
 
 
-class Spinach:
+class Engine:
+    """Spinach Engine coordinating a broker with workers.
+
+    :arg broker: instance of a :class:`Broker`
+    :arg namespace: name of the namespace used by the Engine. When different
+         Engines use the same Redis server, they must use different
+         namespaces to isolate themselves.
+    """
 
     def __init__(self, broker: Broker, namespace: str=DEFAULT_NAMESPACE):
         self._broker = broker
@@ -31,9 +38,18 @@ class Spinach:
 
     @property
     def namespace(self) -> str:
+        """Namespace the Engine uses."""
         return self._namespace
 
     def attach_tasks(self, tasks: Tasks):
+        """Attach a set of tasks.
+
+        A task cannot be scheduled or executed before it is attached to an
+        Engine.
+
+        >>> tasks = Tasks()
+        >>> spin.attach_tasks(tasks)
+        """
         self._tasks.update(tasks.tasks)
         tasks._spin = self
 
@@ -52,7 +68,9 @@ class Spinach:
     def schedule(self, task_name: str, *args, **kwargs):
         """Schedule a job to be executed as soon as possible.
 
-        :arg task_name: Name to the task to execute
+        :arg task_name: name of the task to execute
+        :arg args: args to be passed to the task function
+        :arg kwargs: kwargs to be passed to the task function
         """
         at = datetime.now(timezone.utc)
         return self.schedule_at(task_name, at, *args, **kwargs)
@@ -60,11 +78,13 @@ class Spinach:
     def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
         """Schedule a job to be executed in the future.
 
-        :arg task_name: Name to the task to execute
-        :arg at: Date at which the job should start. It is advised to pass a
+        :arg task_name: name of the task to execute
+        :arg at: date at which the job should start. It is advised to pass a
                  timezone aware datetime to lift any ambiguity. However if a
                  timezone naive datetime if given, it will be assumed to
                  contain UTC time.
+        :arg args: args to be passed to the task function
+        :arg kwargs: kwargs to be passed to the task function
         """
         task = self._get_task(task_name)
         job = Job(task.name, task.queue, at, task.max_retries, task_args=args,
@@ -97,8 +117,16 @@ class Spinach:
         logger.debug('Arbiter terminated')
 
     def start_workers(self, number: int=5, queue=DEFAULT_QUEUE, block=True):
+        """Start the worker threads.
+
+        :arg number: number of worker threads to launch
+        :arg queue: name of the queue to consume, see :doc:`queues`
+        :arg block: whether to block the calling thread until a signal arrives
+             and workers get terminated
+        """
         if self._arbiter or self._workers:
             raise RuntimeError('Workers can only be started once')
+
         self._working_queue = queue
 
         # Start the broker
@@ -126,6 +154,7 @@ class Spinach:
                 self.stop_workers()
 
     def stop_workers(self):
+        """Stop the workers and wait for them to terminate."""
         self._must_stop.set()
         self._workers.stop()
         self._broker.stop()

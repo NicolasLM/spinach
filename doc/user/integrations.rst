@@ -46,6 +46,7 @@ The integration just needs to be registered before starting workers::
     raven_client = Client('https://sentry_dsn/42')
     register_sentry(raven_client)
 
-    spin = Spinach(MemoryBroker())
+    spin = Engine(MemoryBroker())
     spin.start_workers()
 
+.. autofunction:: spinach.contrib.sentry.register_sentry

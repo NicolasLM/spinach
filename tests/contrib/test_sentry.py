@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from spinach import Spinach, MemoryBroker, Tasks
+from spinach import Engine, MemoryBroker, Tasks
 from spinach.contrib.sentry import register_sentry
 
 
@@ -19,7 +19,7 @@ def spin():
     def success():
         return
 
-    s = Spinach(MemoryBroker(), namespace='tests')
+    s = Engine(MemoryBroker(), namespace='tests')
     s.attach_tasks(tasks)
     s.start_workers(number=1, block=False)
     yield s

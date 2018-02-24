@@ -1,14 +1,14 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 
-from spinach import Spinach, MemoryBroker
+from spinach import Engine, MemoryBroker
 from spinach.job import Job, JobStatus
 
 
 @pytest.fixture
 def spin():
-    s = Spinach(MemoryBroker(), namespace='tests')
+    s = Engine(MemoryBroker(), namespace='tests')
     s.start_workers(number=1, block=False)
     yield s
     s.stop_workers()

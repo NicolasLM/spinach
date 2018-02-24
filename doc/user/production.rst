@@ -40,13 +40,15 @@ Spinach:
 - Tasks that are NOT safe to be retried have their `max_retries` set to `0`
 - Tasks that are safe to be retried have their `max_retries` set to a positive
   number
-- Retries happen after an exponential delay with randomized jitter (the default)
+- Retries happen after an exponential delay with randomized jitter (the
+  default)
 - Task `args` and `kwargs` are JSON serializable
 - The user's code is thread-safe
 - Tasks do not store state in the process between invocations
 - Configure logging and send exceptions to Sentry, see :doc:`integrations`
 - Use different queues if tasks have different usage pattens, see :doc:`queues`
-- Use different namespaces if multiple Spinach applications share the same Redis
+- Use different namespaces if multiple Spinach applications share the same
+  Redis, see :doc:`engine`
 
 Redis:
 

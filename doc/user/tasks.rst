@@ -21,8 +21,8 @@ To define a task::
 Retries and Idempotency
 -----------------------
 
-Spinach knows two kinds of tasks: the ones that are idempotent and the ones that
-are not. Since Spinach cannot guess if a task code is safe to be retried
+Spinach knows two kinds of tasks: the ones that are idempotent and the ones
+that are not. Since Spinach cannot guess if a task code is safe to be retried
 multiple times, it must be annotated when the task is created.
 
 Non-Idempotent Tasks
@@ -60,12 +60,12 @@ Idempotent tasks are defined with a positive `max_retries` value::
 Tasks Registry
 --------------
 
-Before being attached to a :class:`Spinach` instance, tasks are created inside
+Before being attached to a Spinach :class:`Engine`, tasks are created inside
 a :class:`Tasks` registry.
 
 This may seem cumbersome for trivial applications, like the examples in this
-documentation, but there is a good reason not to directly attach tasks to a
-:class:`Spinach` instance.
+documentation, but there is a good reason not to directly attach tasks to an
+:class:`Engine`.
 
 Attaching tasks to a dumb :class:`Tasks` registry instead allows to compose
 large applications in smaller units independent from each other, the same way a

@@ -28,8 +28,8 @@ def test_normal_job(broker):
     assert job.status == JobStatus.QUEUED
 
     job.status = JobStatus.RUNNING
-    assert broker.get_job_from_queue('foo_queue') == job
-    assert broker.get_job_from_queue('foo_queue') is None
+    assert broker.get_jobs_from_queue('foo_queue', 5) == [job]
+    assert broker.get_jobs_from_queue('foo_queue', 1) == []
 
 
 def test_future_job(broker, patch_now):
@@ -41,7 +41,7 @@ def test_future_job(broker, patch_now):
 
     broker.enqueue_jobs([job])
     assert job.status == JobStatus.WAITING
-    assert broker.get_job_from_queue('foo_queue') is None
+    assert broker.get_jobs_from_queue('foo_queue', 5) == []
     assert broker.next_future_job_delta == 600
     assert broker.move_future_jobs() == 0
 
@@ -50,8 +50,7 @@ def test_future_job(broker, patch_now):
     assert broker.move_future_jobs() == 1
 
     job.status = JobStatus.RUNNING
-    assert broker.get_job_from_queue('foo_queue') == job
-    assert broker.next_future_job_delta is None
+    assert broker.get_jobs_from_queue('foo_queue', 5) == [job]
 
 
 def test_wait_for_events_no_future_job(broker):
@@ -87,7 +86,7 @@ def test_flush(broker):
         Job('t2', 'q2', get_now() + timedelta(seconds=10), 0)
     ])
     broker.flush()
-    assert broker.get_job_from_queue('q1') is None
+    assert broker.get_jobs_from_queue('q1', 1) == []
     assert broker.next_future_job_delta is None
 
 

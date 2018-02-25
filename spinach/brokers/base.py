@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from logging import getLogger
 import threading
-from typing import Optional, Iterable
+from typing import Optional, Iterable, List
 import uuid
 
 from ..job import Job
@@ -64,8 +64,8 @@ class Broker(ABC):
         """Remove a job from the list of running ones."""
 
     @abstractmethod
-    def get_job_from_queue(self, queue: str):
-        """Get a job from a queue."""
+    def get_jobs_from_queue(self, queue: str, max_jobs: int) -> List[Job]:
+        """Get jobs from a queue."""
 
     @abstractmethod
     def move_future_jobs(self) -> int:

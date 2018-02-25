@@ -1,7 +1,7 @@
 from logging import getLogger
 from queue import Queue, Empty
 import threading
-from typing import Optional, Iterable
+from typing import Optional, Iterable, List
 
 from .base import Broker
 from ..job import Job, JobStatus
@@ -65,15 +65,20 @@ class MemoryBroker(Broker):
             except IndexError:
                 return None
 
-    def get_job_from_queue(self, queue_name: str) -> Optional[Job]:
-        try:
-            job_json_string = self._get_queue(queue_name).get(block=False)
-        except Empty:
-            return None
-        else:
+    def get_jobs_from_queue(self, queue: str, max_jobs: int) -> List[Job]:
+        """Get jobs from a queue."""
+        rv = list()
+        while len(rv) < max_jobs:
+            try:
+                job_json_string = self._get_queue(queue).get(block=False)
+            except Empty:
+                break
+
             job = Job.deserialize(job_json_string)
             job.status = JobStatus.RUNNING
-            return job
+            rv.append(job)
+
+        return rv
 
     def flush(self):
         with self._lock:

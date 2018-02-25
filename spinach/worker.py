@@ -19,13 +19,15 @@ class MaxUnfinishedQueue(Queue):
 
     def empty(self):
         with self.mutex:
-            return not self._qsize() and not self.unfinished_tasks
+            return self.unfinished_tasks == 0
 
     def full(self):
         with self.mutex:
-            too_many_items = 0 < self.maxsize <= self._qsize()
-            too_many_unfinished_tasks = self.maxsize <= self.unfinished_tasks
-            return too_many_items or too_many_unfinished_tasks
+            return self.maxsize <= self.unfinished_tasks
+
+    def available_slots(self) -> int:
+        with self.mutex:
+            return self.maxsize - self.unfinished_tasks
 
 
 class Workers:
@@ -88,17 +90,17 @@ class Workers:
             raise RuntimeError('Cannot submit job: workers are shutting down')
         self._queue.put(job)
 
-    def can_accept_job(self) -> bool:
-        """Tells whether a worker is available to take a job.
+    @property
+    def available_slots(self) -> int:
+        """Number of jobs the :class:`Workers` can accept.
 
-        Queue.full() is racy, but it should not be a problem here as jobs are
+        It may be racy, but it should not be a problem here as jobs are
         only submitted by a single thread (the arbiter).
         """
-        if self._queue.full():
-            return False
-        if self._must_stop.is_set():
-            return False
-        return True
+        return self._queue.available_slots()
+
+    def can_accept_job(self) -> bool:
+        return self.available_slots > 0
 
     def stop(self):
         if self._must_stop.is_set():

@@ -40,25 +40,32 @@ def wait_for_queue_empty(workers: Workers, timeout=10):
 def test_max_unfinished_queue():
     queue = MaxUnfinishedQueue(maxsize=2)
     assert queue.empty()
+    assert queue.available_slots() == 2
 
     queue.put(None)
     assert not queue.full()
     assert not queue.empty()
+    assert queue.available_slots() == 1
 
     queue.put(None)
     assert queue.full()
+    assert queue.available_slots() == 0
 
     queue.get()
     assert queue.full()
+    assert queue.available_slots() == 0
 
     queue.task_done()
     assert not queue.full()
+    assert queue.available_slots() == 1
 
     queue.get()
     assert not queue.empty()
+    assert queue.available_slots() == 1
 
     queue.task_done()
     assert queue.empty()
+    assert queue.available_slots() == 2
 
 
 def test_job_execution(workers, job):
@@ -145,11 +152,11 @@ def test_worker_signals(job):
 
 def test_can_accept_job(workers, job):
     workers, callback = workers
-    assert workers.can_accept_job()
+    assert workers.available_slots == 2
 
     workers.submit_job(job)
     workers.submit_job(job)
-    assert not workers.can_accept_job()
+    assert workers.available_slots == 0
 
-    workers.stop()
-    assert not workers.can_accept_job()
+    wait_for_queue_empty(workers)
+    assert workers.available_slots == 2

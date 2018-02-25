@@ -36,7 +36,7 @@ def test_running_job(broker):
     job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 0)
     broker.enqueue_jobs([job])
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
-    broker.get_job_from_queue('foo_queue')
+    broker.get_jobs_from_queue('foo_queue', 1)
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     # Try to remove it, even if it doesn't exist in running
     broker.remove_job_from_running(job)
@@ -45,7 +45,7 @@ def test_running_job(broker):
     job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 10)
     broker.enqueue_jobs([job])
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
-    broker.get_job_from_queue('foo_queue')
+    broker.get_jobs_from_queue('foo_queue', 1)
     job.status = JobStatus.RUNNING
     assert (
         Job.deserialize(broker._r.hget(running_jobs_key, str(job.id)).decode())
@@ -56,7 +56,7 @@ def test_running_job(broker):
     job.retries += 1
     broker.enqueue_jobs([job])
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
-    broker.get_job_from_queue('foo_queue')
+    broker.get_jobs_from_queue('foo_queue', 1)
     job.status = JobStatus.RUNNING
     assert (
         Job.deserialize(broker._r.hget(running_jobs_key, str(job.id)).decode())
@@ -66,4 +66,4 @@ def test_running_job(broker):
     # Idempotent job - job succeeded
     broker.remove_job_from_running(job)
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
-    assert broker.get_job_from_queue('foo_queue') is None
+    assert broker.get_jobs_from_queue('foo_queue', 1) == []

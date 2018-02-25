@@ -116,10 +116,14 @@ class Engine:
 
             self._broker.move_future_jobs()
 
-            if self._workers.can_accept_job():
-                job = self._broker.get_job_from_queue(self._working_queue)
-
-                while job:
+            received_jobs = 0
+            available_slots = self._workers.available_slots
+            if available_slots > 0:
+                jobs = self._broker.get_jobs_from_queue(
+                    self._working_queue, available_slots
+                )
+                for job in jobs:
+                    received_jobs += 1
                     try:
                         job.task_func = self._get_task(job.task_name).func
                     except exc.UnknownTask as err:
@@ -127,14 +131,8 @@ class Engine:
                     else:
                         self._workers.submit_job(job)
 
-                    if self._workers.can_accept_job():
-                        job = self._broker.get_job_from_queue(
-                            self._working_queue
-                        )
-                    else:
-                        job = None
-
-            logger.debug('Arbiter waiting for events')
+            logger.debug('Received %s jobs, now waiting for events',
+                         received_jobs)
             self._broker.wait_for_event()
 
         logger.debug('Arbiter terminated')

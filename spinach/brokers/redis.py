@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
+import json
 from logging import getLogger
 import math
 from os import path
 import socket
 import threading
-from typing import Optional, Iterable
+from typing import Optional, Iterable, List
 
 from redis import StrictRedis
 from redis.client import Script
@@ -36,7 +37,9 @@ class RedisBroker(Broker):
         self._enqueue_job = self._load_script('enqueue_job.lua')
         self._enqueue_future_job = self._load_script('enqueue_future_job.lua')
         self._flush = self._load_script('flush.lua')
-        self._get_job_from_queue = self._load_script('get_job_from_queue.lua')
+        self._get_jobs_from_queue = self._load_script(
+            'get_jobs_from_queue.lua'
+        )
 
         self._subscriber_thread = None
         self._must_stop = threading.Event()
@@ -102,17 +105,20 @@ class RedisBroker(Broker):
             return None
         return Job.deserialize(job[0].decode())
 
-    def get_job_from_queue(self, queue: str) -> Optional[Job]:
-        job_json_string = self._run_script(
-            self._get_job_from_queue,
+    def get_jobs_from_queue(self, queue: str, max_jobs: int) -> List[Job]:
+        """Get jobs from a queue."""
+        jobs_json_string = self._run_script(
+            self._get_jobs_from_queue,
             self._to_namespaced(queue),
             self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
-            JobStatus.RUNNING.value
+            JobStatus.RUNNING.value,
+            max_jobs
         )
-        if not job_json_string:
-            return None
 
-        return Job.deserialize(job_json_string.decode())
+        jobs = json.loads(jobs_json_string.decode())
+        jobs = [Job.deserialize(job) for job in jobs]
+
+        return jobs
 
     def remove_job_from_running(self, job: Job):
         if job.max_retries > 0:

@@ -1,6 +1,8 @@
+from datetime import timedelta
 import threading
 from unittest.mock import Mock, patch, ANY
 
+import pytest
 from redis import ConnectionError
 
 from spinach import utils
@@ -14,10 +16,12 @@ def test_human_duration():
     assert utils.human_duration(2500) == '2500 s'
 
 
-@patch('spinach.utils.time.sleep')
-def test_run_forever(_):
+@patch('spinach.utils.time.monotonic')
+@patch('spinach.utils.exponential_backoff', return_value=timedelta())
+def test_run_forever(_, mock_monotonic):
     must_stop = threading.Event()
     logger = Mock()
+    mock_monotonic.side_effect = [0, 0, 800, 0, 0, 0]
     call_count = 0
 
     def func():
@@ -36,6 +40,18 @@ def test_run_forever(_):
 
     utils.run_forever(func, must_stop, logger)
     assert call_count == 4
-    logger.exception.assert_called_once_with(ANY)
-    logger.warning.assert_called_once_with(ANY, ANY)
+    logger.exception.assert_called_once_with(ANY, ANY)
+    logger.warning.assert_called_once_with(ANY, ANY, ANY)
     assert must_stop.is_set()
+
+
+def test_exponential_backoff():
+    with pytest.raises(ValueError):
+        utils.exponential_backoff(0)
+
+    assert (
+        timedelta(seconds=3) <= utils.exponential_backoff(1)
+        <= timedelta(seconds=6)
+    )
+    assert utils.exponential_backoff(10000) <= timedelta(minutes=20)
+    assert utils.exponential_backoff(10000, cap=60) <= timedelta(minutes=1)

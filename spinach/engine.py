@@ -4,8 +4,8 @@ import threading
 import time
 from typing import Optional
 
-from .task import Task, Tasks, Batch, RetryException, exponential_backoff
-from .utils import human_duration, run_forever
+from .task import Task, Tasks, Batch, RetryException
+from .utils import human_duration, run_forever, exponential_backoff
 from .job import Job, JobStatus
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE

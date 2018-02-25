@@ -43,6 +43,8 @@ Spinach:
 - Retries happen after an exponential delay with randomized jitter (the
   default)
 - Task `args` and `kwargs` are JSON serializable and small in size
+- Jobs are sent in :class:`Batch` to the broker when multiple jobs are to be
+  scheduled at once
 - The user's code is thread-safe
 - Tasks do not store state in the process between invocations
 - Logging is configured and exceptions are sent to Sentry, see

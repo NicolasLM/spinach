@@ -71,7 +71,7 @@ an unexpected exception::
 To allow the system to recover gracefully, a default backoff strategy is
 applied.
 
-.. autofunction:: spinach.task.exponential_backoff
+.. autofunction:: spinach.utils.exponential_backoff
 
 To be more explicit, a task can also raise a :class:`RetryException` which
 allows to precisely control when it should be retried::

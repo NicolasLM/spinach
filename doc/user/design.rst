@@ -173,3 +173,21 @@ as there are tasks to schedule. There are some workarounds but they just move
 the problem elsewhere.
 
 Spinach supports sending tasks to the broker in batch to avoid this overhead.
+
+Written for the Cloud
+---------------------
+
+Latency between workers and Redis can be high, for example when they are
+deployed in two separate regions. Spinach leverages Lua scripting in Redis to
+avoid unnecessary round-trips by batching calls as much as possible.
+
+In a cloud environment network connections can get dropped and packets get
+lost. Spinach retries failed actions after applying an exponential backoff with
+randomized jitter to avoid the thundering herd problem when the network gets
+back to normal.
+
+Workers are expected to be deployed in containers, probably managed by an
+orchestrator like Kubernetes or Nomad that often scale and shuffle containers
+around. Workers can join and leave the cluster at any time without impacting
+the ability to process jobs.
+

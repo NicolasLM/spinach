@@ -1,8 +1,7 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import functools
 from typing import Optional, Callable
 from numbers import Number
-import random
 
 from . import const
 
@@ -208,20 +207,6 @@ class Batch:
         :arg kwargs: kwargs to be passed to the task function
         """
         self.jobs_to_create.append((task_name, at, args, kwargs))
-
-
-def exponential_backoff(attempt: int) -> timedelta:
-    """Calculate a delay to retry using an exponential backoff algorithm.
-
-    It is an exponential backoff with random jitter to prevent all failed tasks
-    from being retried at the same time. It is a good fit for most
-    applications.
-    """
-    cap = 1200  # max 20 minutes
-    base = 3
-
-    temp = min(base * 2 ** attempt, cap)
-    return timedelta(seconds=temp / 2 + random.randint(0, temp / 2))
 
 
 class RetryException(Exception):

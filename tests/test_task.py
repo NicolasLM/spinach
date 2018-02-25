@@ -1,12 +1,9 @@
 import copy
-from datetime import timedelta
 from unittest import mock
 
 import pytest
 
-from spinach.task import (
-    Task, Tasks, Batch, RetryException, exponential_backoff
-)
+from spinach.task import (Task, Tasks, Batch, RetryException)
 from spinach import const
 
 from .conftest import get_now
@@ -135,16 +132,6 @@ def test_tasks_scheduling(task):
 
     tasks.schedule_batch(batch)
     spin.schedule_batch.assert_called_once_with(batch)
-
-
-def test_exponential_backoff():
-    with pytest.raises(ValueError):
-        exponential_backoff(0)
-
-    assert (
-        timedelta(seconds=3) <= exponential_backoff(1) <= timedelta(seconds=6)
-    )
-    assert exponential_backoff(10000) <= timedelta(minutes=20)
 
 
 def test_retry_exception():

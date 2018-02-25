@@ -35,6 +35,7 @@ def patch_now(monkeypatch):
     monkeypatch.setattr('spinach.brokers.redis.datetime', MyDatetime)
     monkeypatch.setattr('spinach.job.datetime', MyDatetime)
     monkeypatch.setattr('spinach.engine.datetime', MyDatetime)
+    monkeypatch.setattr('spinach.task.datetime', MyDatetime)
 
 
 def get_now() -> datetime:

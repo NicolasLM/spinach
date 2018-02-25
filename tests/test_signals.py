@@ -28,3 +28,7 @@ def test_signal_receiver_exception():
     signals.job_started.connect(mock_receiver)
 
     signals.job_started.send()
+
+
+def test_signal_repr():
+    assert repr(signals.job_started) == 'SafeNamedSignal "job_started"'

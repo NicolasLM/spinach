@@ -159,3 +159,17 @@ Spinach app though your Python code. You can read settings from environment
 variables, from a file or anything else possible in Python.
 
 It is then easy to use it to create your own entrypoint to launch the workers.
+
+Schedule tasks in batch
+-----------------------
+
+A pattern that is used frequently with task queues is to periodically scan
+all entities and schedule an individual task for each entity that needs further
+work. For instance closing user accounts of member who haven't logged in in a
+year.
+
+With Celery this results in having to do as many round-trips to the broker
+as there are tasks to schedule. There are some workarounds but they just move
+the problem elsewhere.
+
+Spinach supports sending tasks to the broker in batch to avoid this overhead.

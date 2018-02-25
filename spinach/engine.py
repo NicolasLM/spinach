@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Optional
 
-from .task import Task, Tasks, RetryException, exponential_backoff
+from .task import Task, Tasks, Batch, RetryException, exponential_backoff
 from .utils import human_duration, run_forever
 from .job import Job, JobStatus
 from .brokers.base import Broker
@@ -91,7 +91,24 @@ class Engine:
         task = self._get_task(task_name)
         job = Job(task.name, task.queue, at, task.max_retries, task_args=args,
                   task_kwargs=kwargs)
-        return self._broker.enqueue_job(job)
+        return self._broker.enqueue_jobs([job])
+
+    def schedule_batch(self, batch: Batch):
+        """Schedule many jobs at once.
+
+        Scheduling jobs in batches allows to enqueue them fast by avoiding
+        round-trips to the broker.
+
+        :arg batch: :class:`Batch` instance containing jobs to schedule
+        """
+        jobs = list()
+        for task_name, at, args, kwargs in batch.jobs_to_create:
+            task = self._get_task(task_name)
+            jobs.append(
+                Job(task.name, task.queue, at, task.max_retries,
+                    task_args=args, task_kwargs=kwargs)
+            )
+        return self._broker.enqueue_jobs(jobs)
 
     def _arbiter_func(self):
         logger.debug('Arbiter started')
@@ -186,7 +203,7 @@ class Engine:
 
             signals.job_schedule_retry.send(self._namespace, job=job, err=err)
             # No need to remove job from running, enqueue does it
-            self._broker.enqueue_job(job)
+            self._broker.enqueue_jobs([job])
 
             log_args = (
                 job.retries, job.max_retries + 1, job, duration,

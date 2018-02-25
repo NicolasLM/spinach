@@ -4,7 +4,7 @@ import math
 from os import path
 import socket
 import threading
-from typing import Optional
+from typing import Optional, Iterable
 
 from redis import StrictRedis
 from redis.client import Script
@@ -50,28 +50,34 @@ class RedisBroker(Broker):
         args = [str(self._id)] + list(args)
         return script(args=args)
 
-    def enqueue_job(self, job: Job):
-        """Add a job to a queue."""
-        if job.should_start:
-            job.status = JobStatus.QUEUED
+    def enqueue_jobs(self, jobs: Iterable[Job]):
+        """Enqueue a batch of jobs."""
+        jobs_to_queue = list()
+        future_jobs = list()
+        for job in jobs:
+            if job.should_start:
+                job.status = JobStatus.QUEUED
+                jobs_to_queue.append(job.serialize())
+            else:
+                job.status = JobStatus.WAITING
+                future_jobs.append(job.serialize())
+
+        if jobs_to_queue:
             self._run_script(
                 self._enqueue_job,
-                self._to_namespaced(job.queue),
                 self._to_namespaced(NOTIFICATIONS_KEY),
-                job.serialize(),
-                job.id,
                 self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+                self.namespace,
+                *jobs_to_queue
             )
-        else:
-            job.status = JobStatus.WAITING
+
+        if future_jobs:
             self._run_script(
                 self._enqueue_future_job,
-                self._to_namespaced(FUTURE_JOBS_KEY),
                 self._to_namespaced(NOTIFICATIONS_KEY),
-                job.at_timestamp,
-                job.serialize(),
-                job.id,
                 self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+                self._to_namespaced(FUTURE_JOBS_KEY),
+                *future_jobs
             )
 
     def move_future_jobs(self) -> int:

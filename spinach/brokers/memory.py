@@ -1,7 +1,7 @@
 from logging import getLogger
 from queue import Queue, Empty
 import threading
-from typing import Optional
+from typing import Optional, Iterable
 
 from .base import Broker
 from ..job import Job, JobStatus
@@ -28,16 +28,18 @@ class MemoryBroker(Broker):
                 self._queues[queue_name] = queue
                 return queue
 
-    def enqueue_job(self, job: Job):
-        if job.should_start:
-            job.status = JobStatus.QUEUED
-            queue = self._get_queue(job.queue)
-            queue.put(job.serialize())
-        else:
-            with self._lock:
-                job.status = JobStatus.WAITING
-                self._future_jobs.append(job.serialize())
-                self._future_jobs.sort(key=lambda j: Job.deserialize(j).at)
+    def enqueue_jobs(self, jobs: Iterable[Job]):
+        """Enqueue a batch of jobs."""
+        for job in jobs:
+            if job.should_start:
+                job.status = JobStatus.QUEUED
+                queue = self._get_queue(job.queue)
+                queue.put(job.serialize())
+            else:
+                with self._lock:
+                    job.status = JobStatus.WAITING
+                    self._future_jobs.append(job.serialize())
+                    self._future_jobs.sort(key=lambda j: Job.deserialize(j).at)
         self._something_happened.set()
 
     def move_future_jobs(self) -> int:

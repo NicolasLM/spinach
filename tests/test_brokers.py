@@ -24,7 +24,7 @@ def broker(request):
 def test_normal_job(broker):
     job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 0,
               task_args=(1, 2), task_kwargs={'foo': 'bar'})
-    broker.enqueue_job(job)
+    broker.enqueue_jobs([job])
     assert job.status == JobStatus.QUEUED
 
     job.status = JobStatus.RUNNING
@@ -39,7 +39,7 @@ def test_future_job(broker, patch_now):
     job = Job('foo_task', 'foo_queue', get_now() + timedelta(minutes=10), 0,
               task_args=(1, 2), task_kwargs={'foo': 'bar'})
 
-    broker.enqueue_job(job)
+    broker.enqueue_jobs([job])
     assert job.status == JobStatus.WAITING
     assert broker.get_job_from_queue('foo_queue') is None
     assert broker.next_future_job_delta == 600
@@ -73,8 +73,8 @@ def test_wait_for_events_no_future_job(broker):
     (timedelta(seconds=5), 5)
 ])
 def test_wait_for_events_with_future_job(broker, patch_now, delta, timeout):
-    broker.enqueue_job(
-        Job('foo_task', 'foo_queue', get_now() + delta, 0)
+    broker.enqueue_jobs(
+        [Job('foo_task', 'foo_queue', get_now() + delta, 0)]
     )
     with patch.object(broker, '_something_happened') as mock_sh:
         broker.wait_for_event()
@@ -82,8 +82,10 @@ def test_wait_for_events_with_future_job(broker, patch_now, delta, timeout):
 
 
 def test_flush(broker):
-    broker.enqueue_job(Job('t1', 'q1', get_now(), 0))
-    broker.enqueue_job(Job('t2', 'q2', get_now() + timedelta(seconds=10), 0))
+    broker.enqueue_jobs([
+        Job('t1', 'q1', get_now(), 0),
+        Job('t2', 'q2', get_now() + timedelta(seconds=10), 0)
+    ])
     broker.flush()
     assert broker.get_job_from_queue('q1') is None
     assert broker.next_future_job_delta is None

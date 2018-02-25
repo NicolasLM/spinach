@@ -34,7 +34,7 @@ def test_running_job(broker):
 
     # Non-idempotent job
     job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 0)
-    broker.enqueue_job(job)
+    broker.enqueue_jobs([job])
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_job_from_queue('foo_queue')
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
@@ -43,7 +43,7 @@ def test_running_job(broker):
 
     # Idempotent job - get from queue
     job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 10)
-    broker.enqueue_job(job)
+    broker.enqueue_jobs([job])
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_job_from_queue('foo_queue')
     job.status = JobStatus.RUNNING
@@ -54,7 +54,7 @@ def test_running_job(broker):
 
     # Idempotent job - re-enqueue after job ran with error
     job.retries += 1
-    broker.enqueue_job(job)
+    broker.enqueue_jobs([job])
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_job_from_queue('foo_queue')
     job.status = JobStatus.RUNNING

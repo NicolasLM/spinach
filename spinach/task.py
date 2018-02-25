@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import functools
 from typing import Optional, Callable
 from numbers import Number
@@ -123,7 +123,7 @@ class Tasks:
             )
 
     def schedule(self, task_name: str, *args, **kwargs):
-        """Schedule a job.
+        """Schedule a job to be executed as soon as possible.
 
         :arg task_name: name of the task to execute in the background
         :arg args: args to be passed to the task function
@@ -136,7 +136,7 @@ class Tasks:
         self._spin.schedule(task_name, *args, **kwargs)
 
     def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
-        """Schedule a job in the future
+        """Schedule a job to be executed in the future.
 
         :arg task_name: name of the task to execute in the background
         :arg at: Date at which the job should start. It is advised to pass a
@@ -151,6 +151,63 @@ class Tasks:
         """
         self._require_attached_tasks()
         self._spin.schedule_at(task_name, at, *args, **kwargs)
+
+    def schedule_batch(self, batch: 'Batch'):
+        """Schedule many jobs at once.
+
+        Scheduling jobs in batches allows to enqueue them fast by avoiding
+        round-trips to the broker.
+
+        :arg batch: :class:`Batch` instance containing jobs to schedule
+        """
+        self._require_attached_tasks()
+        self._spin.schedule_batch(batch)
+
+
+class Batch:
+    """Container allowing to schedule many jobs at once.
+
+    Batching the scheduling of jobs allows to avoid doing many round-trips
+    to the broker, reducing the overhead and the chance of errors associated
+    with doing network calls.
+
+    In this example 100 jobs are sent to Redis in one call:
+
+    >>> batch = Batch()
+    >>> for i in range(100):
+    ...     batch.schedule('compute', i)
+    ...
+    >>> spin.schedule_batch(batch)
+
+    Once the :class:`Batch` is passed to the :class:`Engine` it should be
+    disposed off and not be reused.
+    """
+
+    def __init__(self):
+        self.jobs_to_create = list()
+
+    def schedule(self, task_name: str, *args, **kwargs):
+        """Add a job to be executed ASAP to the batch.
+
+        :arg task_name: name of the task to execute in the background
+        :arg args: args to be passed to the task function
+        :arg kwargs: kwargs to be passed to the task function
+        """
+        at = datetime.now(timezone.utc)
+        self.schedule_at(task_name, at, *args, **kwargs)
+
+    def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
+        """Add a job to be executed in the future to the batch.
+
+        :arg task_name: name of the task to execute in the background
+        :arg at: Date at which the job should start. It is advised to pass a
+                 timezone aware datetime to lift any ambiguity. However if a
+                 timezone naive datetime if given, it will be assumed to
+                 contain UTC time.
+        :arg args: args to be passed to the task function
+        :arg kwargs: kwargs to be passed to the task function
+        """
+        self.jobs_to_create.append((task_name, at, args, kwargs))
 
 
 def exponential_backoff(attempt: int) -> timedelta:

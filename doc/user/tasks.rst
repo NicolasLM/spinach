@@ -105,3 +105,9 @@ Django project is composed of many small Django apps.
 
 .. autoclass:: spinach.task.Tasks
     :members:
+
+Batch
+-----
+
+.. autoclass:: spinach.task.Batch
+    :members:

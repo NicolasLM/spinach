@@ -4,7 +4,9 @@ from unittest import mock
 
 import pytest
 
-from spinach.task import Task, Tasks, RetryException, exponential_backoff
+from spinach.task import (
+    Task, Tasks, Batch, RetryException, exponential_backoff
+)
 from spinach import const
 
 from .conftest import get_now
@@ -113,11 +115,14 @@ def test_task_function_can_be_called():
 def test_tasks_scheduling(task):
     tasks = Tasks()
     tasks.add(print, 'write_to_stdout', queue='foo_queue')
+    batch = Batch()
 
     with pytest.raises(RuntimeError):
         tasks.schedule('write_to_stdout')
     with pytest.raises(RuntimeError):
         tasks.schedule_at('write_to_stdout', get_now())
+    with pytest.raises(RuntimeError):
+        tasks.schedule_batch(batch)
 
     spin = mock.Mock()
     tasks._spin = spin
@@ -127,6 +132,9 @@ def test_tasks_scheduling(task):
 
     tasks.schedule_at('write_to_stdout', get_now())
     spin.schedule_at.assert_called_once_with('write_to_stdout', get_now())
+
+    tasks.schedule_batch(batch)
+    spin.schedule_batch.assert_called_once_with(batch)
 
 
 def test_exponential_backoff():
@@ -147,3 +155,15 @@ def test_retry_exception():
     r = RetryException('Bar', get_now())
     assert str(r) == 'Bar'
     assert r.at is get_now()
+
+
+def test_batch(patch_now):
+    now = get_now()
+    batch = Batch()
+    batch.schedule('foo_task', 1, 2)
+    batch.schedule_at('bar_task', now, three=True)
+
+    assert batch.jobs_to_create == [
+        ('foo_task', now, (1, 2), {}),
+        ('bar_task', now, (), {'three': True})
+    ]

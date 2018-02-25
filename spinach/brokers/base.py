@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from logging import getLogger
 import threading
-from typing import Optional
+from typing import Optional, Iterable
 import uuid
 
 from ..job import Job
@@ -56,8 +56,8 @@ class Broker(ABC):
         return '{}/{}'.format(self.namespace, value)
 
     @abstractmethod
-    def enqueue_job(self, job: Job):
-        """Add a job to a queue."""
+    def enqueue_jobs(self, jobs: Iterable[Job]):
+        """Enqueue a batch of jobs."""
 
     @abstractmethod
     def remove_job_from_running(self, job: Job):

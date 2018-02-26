@@ -182,6 +182,7 @@ class Engine:
         self._must_stop.set()
         self._workers.stop()
         self._broker.stop()
+        self._arbiter.join()
 
     def _job_finished_callback(self, job: Job, duration: float,
                                err: Optional[Exception]):

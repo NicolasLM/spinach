@@ -108,3 +108,25 @@ def test_schedule_batch(patch_now):
     assert bar_job.at == now
     assert bar_job.task_args == ()
     assert bar_job.task_kwargs == {'three': True}
+
+
+def test_execute(spin):
+    func = Mock()
+    tasks = Tasks()
+    tasks.add(func, 'foo_task')
+    spin.attach_tasks(tasks)
+
+    spin.execute('foo_task')
+    func.assert_called_once_with()
+
+
+def test_start_workers_twice(spin):
+    with pytest.raises(RuntimeError):
+        spin.start_workers()
+
+
+@patch('spinach.engine.time.sleep', side_effect=[None, KeyboardInterrupt])
+def test_start_workers_blocking(_):
+    spin = Engine(MemoryBroker(), namespace='tests')
+    spin.start_workers(number=1, block=True)
+    assert spin._must_stop.is_set()

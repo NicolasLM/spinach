@@ -140,7 +140,7 @@ class RedisBroker(Broker):
 
             # Consume all messages
             while pub_sub.get_message(timeout=0):
-                pass  # noqa
+                pass  # pragma: no cover
 
             logger.debug('Got a message from channel %s', channel_name)
             self._something_happened.set()
@@ -174,7 +174,7 @@ try:
         socket.TCP_KEEPCNT: 3       # Send 3 probes before closing
     }
     recommended_socket_opts['socket_keepalive'] = True
-except AttributeError:
+except AttributeError:  # pragma: no cover
     # Some non-Linux OS do not have the proper attribute in the socket module
     # for TCP Keepalive
-    pass  # noqa
+    pass

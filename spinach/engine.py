@@ -51,6 +51,8 @@ class Engine:
         >>> tasks = Tasks()
         >>> spin.attach_tasks(tasks)
         """
+        if tasks._spin is not None and tasks._spin is not self:
+            logger.warning('Tasks already attached to a different Engine')
         self._tasks.update(tasks.tasks)
         tasks._spin = self
 

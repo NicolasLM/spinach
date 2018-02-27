@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 
 from spinach.task import (Task, Tasks, Batch, RetryException)
-from spinach import const
+from spinach import const, exc
 
 from .conftest import get_now
 
@@ -107,6 +107,37 @@ def test_task_function_can_be_called():
 
     assert foo(40) == 42
     assert foo(40, 3) == 43
+
+
+def test_tasks_update():
+    tasks_1, tasks_2 = Tasks(), Tasks()
+
+    tasks_1.add(print, 'write_to_stdout', queue='foo_queue')
+    tasks_2.update(tasks_1)
+    assert tasks_1.tasks == tasks_2.tasks
+
+    tasks_2.add(print, 'bar')
+    assert tasks_1.tasks != tasks_2.tasks
+
+
+def test_tasks_names():
+    tasks = Tasks()
+    assert tasks.names == []
+    tasks.add(print, 'foo')
+    tasks.add(print, 'bar')
+    assert sorted(tasks.names) == ['bar', 'foo']
+
+
+def test_tasks_get():
+    tasks = Tasks()
+    with pytest.raises(exc.UnknownTask):
+        tasks.get('foo')
+
+    tasks.add(print, 'foo')
+    r = tasks.get('foo')
+    assert isinstance(r, Task)
+    assert r.name == 'foo'
+    assert r.func == print
 
 
 def test_tasks_scheduling(task):

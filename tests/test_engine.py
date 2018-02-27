@@ -65,17 +65,17 @@ def test_attach_tasks(mock_logger, spin, spin_2):
     spin.attach_tasks(tasks)
     mock_logger.warning.assert_not_called()
     assert tasks._spin is spin
-    assert spin._tasks == tasks.tasks
+    assert spin._tasks.tasks == tasks.tasks
 
     spin.attach_tasks(tasks)
     mock_logger.warning.assert_not_called()
     assert tasks._spin is spin
-    assert spin._tasks == tasks.tasks
+    assert spin._tasks.tasks == tasks.tasks
 
     spin_2.attach_tasks(tasks)
     mock_logger.warning.assert_called_once_with(ANY)
     assert tasks._spin is spin_2
-    assert spin_2._tasks == tasks.tasks
+    assert spin_2._tasks.tasks == tasks.tasks
 
 
 def test_schedule_batch(patch_now):

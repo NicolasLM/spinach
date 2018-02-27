@@ -95,13 +95,26 @@ Tasks Registry
 Before being attached to a Spinach :class:`Engine`, tasks are created inside
 a :class:`Tasks` registry.
 
-This may seem cumbersome for trivial applications, like the examples in this
-documentation, but there is a good reason not to directly attach tasks to an
-:class:`Engine`.
+Attaching tasks to a :class:`Tasks` registry instead of directly to the
+:class:`Engine` allows to compose large applications in smaller units
+independent from each other, the same way a Django project is composed of many
+small Django apps.
 
-Attaching tasks to a dumb :class:`Tasks` registry instead allows to compose
-large applications in smaller units independent from each other, the same way a
-Django project is composed of many small Django apps.
+This may seem cumbersome for trivial applications, like the examples in this
+documentation or some single-module projects, so those can create tasks
+directly on the :class:`Engine` using::
+
+
+    spin = Engine(MemoryBroker())
+
+    @spin.task(name='fast')
+    def fast():
+        time.sleep(1)
+
+.. note:: Creating tasks directly in the :class:`Engine` is a bit like creating
+          a Flask app globally instead of using an `app factory`: it works
+          until a change introduces a circular import. Its usage should really
+          be limited to tiny projects.
 
 .. autoclass:: spinach.task.Tasks
     :members:

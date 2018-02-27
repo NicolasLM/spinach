@@ -1,15 +1,12 @@
-from spinach import Engine, Tasks, MemoryBroker
+from spinach import Engine, MemoryBroker
 
-tasks = Tasks()
+spin = Engine(MemoryBroker())
 
 
-@tasks.task(name='compute')
+@spin.task(name='compute')
 def compute(a, b):
     print('Computed {} + {} = {}'.format(a, b, a + b))
 
-
-spin = Engine(MemoryBroker())
-spin.attach_tasks(tasks)
 
 # Schedule a job to be executed ASAP
 spin.schedule('compute', 5, 3)

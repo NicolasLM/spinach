@@ -31,27 +31,18 @@ Create task and schedule two jobs, one executed now and one later:
 
 .. code:: python
 
-    from datetime import datetime, timedelta, timezone
+    from spinach import Engine, MemoryBroker
 
-    from spinach import Engine, Tasks, MemoryBroker
-
-    tasks = Tasks()
+    spin = Engine(MemoryBroker())
 
 
-    @tasks.task(name='compute')
+    @spin.task(name='compute')
     def compute(a, b):
         print('Computed {} + {} = {}'.format(a, b, a + b))
 
 
-    spin = Engine(MemoryBroker())
-    spin.attach_tasks(tasks)
-
     # Schedule a job to be executed ASAP
     spin.schedule('compute', 5, 3)
-
-    # Schedule a job to be executed in 10 seconds
-    in_10_seconds = datetime.now(timezone.utc) + timedelta(seconds=10)
-    spin.schedule_at('compute', in_10_seconds, 20, 10)
 
     print('Starting workers, ^C to quit')
     spin.start_workers()

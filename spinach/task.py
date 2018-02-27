@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 import functools
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 from numbers import Number
 
-from . import const
+from . import const, exc
 
 
 class Task:
@@ -47,9 +47,25 @@ class Tasks:
         self.max_retries = max_retries
         self._spin = None
 
+    def update(self, tasks: 'Tasks'):
+        self._tasks.update(tasks.tasks)
+
+    @property
+    def names(self) -> List[str]:
+        return list(self._tasks.keys())
+
     @property
     def tasks(self) -> dict:
         return self._tasks
+
+    def get(self, name: str):
+        task = self._tasks.get(name)
+        if task is not None:
+            return task
+
+        raise exc.UnknownTask(
+            'Unknown task "{}", known tasks: {}'.format(name, self.names)
+        )
 
     def task(self, func: Optional[Callable]=None, name: Optional[str]=None,
              queue: Optional[str]=None, max_retries: Optional[Number]=None):
@@ -65,7 +81,6 @@ class Tasks:
         >>> def foo():
         ...    pass
         """
-
         if func is None:
             return functools.partial(self.task, name=name, queue=queue,
                                      max_retries=max_retries)

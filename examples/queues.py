@@ -1,30 +1,27 @@
 import time
 import logging
 
-from spinach import Engine, Tasks, MemoryBroker
+from spinach import Engine, MemoryBroker
 
 
 logging.basicConfig(
     format='%(asctime)s - %(threadName)s %(levelname)s: %(message)s',
     level=logging.DEBUG
 )
-tasks = Tasks()
+spin = Engine(MemoryBroker())
 
 
-@tasks.task(name='fast', queue='high-priority')
+@spin.task(name='fast', queue='high-priority')
 def fast():
     time.sleep(1)
 
 
-@tasks.task(name='slow', queue='low-priority')
+@spin.task(name='slow', queue='low-priority')
 def slow():
     time.sleep(10)
 
 
-spin = Engine(MemoryBroker())
-spin.attach_tasks(tasks)
+spin.schedule('slow')
+spin.schedule('fast')
 
-tasks.schedule('slow')
-tasks.schedule('fast')
-
-spin.start_workers(number=1, queue='low-priority')
+spin.start_workers(number=1, queue='high-priority')

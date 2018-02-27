@@ -4,7 +4,7 @@ import threading
 import time
 from typing import Optional
 
-from .task import Task, Tasks, Batch, RetryException
+from .task import Tasks, Batch, RetryException
 from .utils import human_duration, run_forever, exponential_backoff
 from .job import Job, JobStatus
 from .brokers.base import Broker
@@ -29,7 +29,9 @@ class Engine:
         self._broker = broker
         self._broker.namespace = namespace
         self._namespace = namespace
-        self._tasks = {}
+
+        self._tasks = Tasks()
+        self.task = self._tasks.task
 
         self._arbiter = None
         self._workers = None
@@ -53,21 +55,11 @@ class Engine:
         """
         if tasks._spin is not None and tasks._spin is not self:
             logger.warning('Tasks already attached to a different Engine')
-        self._tasks.update(tasks.tasks)
+        self._tasks.update(tasks)
         tasks._spin = self
 
-    def _get_task(self, name) -> Task:
-        task = self._tasks.get(name)
-        if task is not None:
-            return task
-
-        raise exc.UnknownTask(
-            'Unknown task "{}", known tasks: {}'
-            .format(name, list(self._tasks.keys()))
-        )
-
     def execute(self, task_name: str, *args, **kwargs):
-        return self._get_task(task_name).func(*args, **kwargs)
+        return self._tasks.get(task_name).func(*args, **kwargs)
 
     def schedule(self, task_name: str, *args, **kwargs):
         """Schedule a job to be executed as soon as possible.
@@ -90,7 +82,7 @@ class Engine:
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
         """
-        task = self._get_task(task_name)
+        task = self._tasks.get(task_name)
         job = Job(task.name, task.queue, at, task.max_retries, task_args=args,
                   task_kwargs=kwargs)
         return self._broker.enqueue_jobs([job])
@@ -105,7 +97,7 @@ class Engine:
         """
         jobs = list()
         for task_name, at, args, kwargs in batch.jobs_to_create:
-            task = self._get_task(task_name)
+            task = self._tasks.get(task_name)
             jobs.append(
                 Job(task.name, task.queue, at, task.max_retries,
                     task_args=args, task_kwargs=kwargs)
@@ -127,7 +119,7 @@ class Engine:
                 for job in jobs:
                     received_jobs += 1
                     try:
-                        job.task_func = self._get_task(job.task_name).func
+                        job.task_func = self._tasks.get(job.task_name).func
                     except exc.UnknownTask as err:
                         self._job_finished_callback(job, 0.0, err)
                     else:

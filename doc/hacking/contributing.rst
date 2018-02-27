@@ -43,8 +43,8 @@ patch. The test suite can be run with pytest::
 Compatibility
 -------------
 
-Spinach runs on all versions of Python 3.5 and 3.6. Tests are run on Travis to
-ensure that.
+Spinach runs on all versions of Python starting from 3.5. Tests are run on
+Travis to ensure that.
 
 Documentation sources
 ---------------------

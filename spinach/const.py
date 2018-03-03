@@ -1,4 +1,4 @@
-VERSION = '0.0.4.dev1'
+VERSION = '0.0.4'
 
 DEFAULT_QUEUE = 'spinach'
 DEFAULT_NAMESPACE = 'spinach'

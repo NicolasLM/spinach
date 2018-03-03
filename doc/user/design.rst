@@ -102,8 +102,6 @@ cluster that often redeploys and move containers around.
 All Spinach workers are part of the system that schedules periodic jobs, there
 is no need to have a pet in the cattle farm.
 
-.. todo:: Periodic jobs are not yet available in Spinach
-
 Only two brokers
 ----------------
 

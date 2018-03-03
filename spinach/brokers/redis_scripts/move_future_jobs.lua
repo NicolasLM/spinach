@@ -4,9 +4,46 @@ local future_jobs = ARGV[3]
 local notifications = ARGV[4]
 local now = ARGV[5]
 local job_status_queued = tonumber(ARGV[6])
+local periodic_tasks_hash = ARGV[7]
+local periodic_tasks_queue = ARGV[8]
+-- uuids starting at ARGV[9]
+-- lua in Redis cannot generate random UUIDs, so they are generated in Python
+-- and passed with each calls
 
-local jobs_json = redis.call('zrangebyscore', future_jobs, '-inf', now, 'LIMIT', 0, 1)
+-- Get the future jobs that are due
+-- Limit to fetching 1000 of them to avoid the script to take too long
+local jobs_json = redis.call('zrangebyscore', future_jobs, '-inf', now, 'LIMIT', 0, 1000)
 local jobs_moved = 0
+
+-- Create jobs from due periodic tasks
+local task_names = redis.call('zrangebyscore', periodic_tasks_queue, '-inf', now, 'LIMIT', 0, 10)
+for i, task_name in ipairs(task_names) do
+
+    local task_json = redis.call('hget', periodic_tasks_hash, task_name)
+
+    -- the key task_name may not exist in the hash if the periodic task was deleted
+    if task_json == false then
+        redis.call('zrem', periodic_tasks_queue, task_name)
+    else
+        local task = cjson.decode(task_json)
+        local job = {}
+        job["id"] = ARGV[9 + i - 1]
+        job["status"] = job_status_queued
+        job["task_name"] = task_name
+        job["queue"] = task["queue"]
+        job["max_retries"] = task["max_retries"]
+        job["retries"] = 0
+        job["at"] = tonumber(now)
+        job["at_us"] = 0
+        job["task_args"] = {}
+        job["task_kwargs"] = {}
+        table.insert(jobs_json, cjson.encode(job))
+
+        local next_event_time = job["at"] + task["periodicity"]
+        redis.call('zrem', periodic_tasks_queue, task_name)
+        redis.call('zadd', periodic_tasks_queue, next_event_time, task_name)
+    end
+end
 
 if not jobs_json then
     return jobs_moved

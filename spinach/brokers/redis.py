@@ -5,14 +5,19 @@ import math
 from os import path
 import socket
 import threading
-from typing import Optional, Iterable, List
+from typing import Optional, Iterable, List, Tuple
+import uuid
 
 from redis import StrictRedis
 from redis.client import Script
 
 from ..brokers.base import Broker
 from ..job import Job, JobStatus
-from ..const import FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY
+from ..task import Task
+from ..const import (
+    FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY,
+    PERIODIC_TASKS_HASH_KEY, PERIODIC_TASKS_QUEUE_KEY
+)
 from ..utils import run_forever
 
 
@@ -39,6 +44,9 @@ class RedisBroker(Broker):
         self._flush = self._load_script('flush.lua')
         self._get_jobs_from_queue = self._load_script(
             'get_jobs_from_queue.lua'
+        )
+        self._register_periodic_tasks = self._load_script(
+            'register_periodic_tasks.lua'
         )
 
         self._subscriber_thread = None
@@ -90,7 +98,10 @@ class RedisBroker(Broker):
             self._to_namespaced(FUTURE_JOBS_KEY),
             self._to_namespaced(NOTIFICATIONS_KEY),
             math.ceil(datetime.now(timezone.utc).timestamp()),
-            JobStatus.QUEUED.value
+            JobStatus.QUEUED.value,
+            self._to_namespaced(PERIODIC_TASKS_HASH_KEY),
+            self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
+            *[str(uuid.uuid4()) for _ in range(10)]
         )
         logger.debug("Redis moved %s job(s) from future to current queues",
                      num_jobs_moved)
@@ -160,6 +171,46 @@ class RedisBroker(Broker):
 
     def flush(self):
         self._run_script(self._flush, self.namespace)
+
+    def register_periodic_tasks(self, tasks: Iterable[Task]):
+        """Register tasks that need to be scheduled periodically."""
+        tasks = [task.serialize() for task in tasks]
+        self._run_script(
+            self._register_periodic_tasks,
+            math.ceil(datetime.now(timezone.utc).timestamp()),
+            self._to_namespaced(PERIODIC_TASKS_HASH_KEY),
+            self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
+            *tasks
+        )
+
+    def inspect_periodic_tasks(self) -> List[Tuple[int, str]]:
+        """Get the next periodic task schedule.
+
+        Used only for debugging and during tests.
+        """
+        rv = self._r.zrangebyscore(
+            self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
+            '-inf',  '+inf', withscores=True
+        )
+        return [(int(r[1]), r[0].decode()) for r in rv]
+
+    @property
+    def next_future_periodic_delta(self) -> Optional[float]:
+        """Give the amount of seconds before the next periodic task is due."""
+        rv = self._r.zrangebyscore(
+            self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
+            '-inf',  '+inf', start=0, num=1, withscores=True,
+            score_cast_func=int
+        )
+        if not rv:
+            return None
+
+        now = datetime.now(timezone.utc).timestamp()
+        next_event_time = rv[0][1]
+        if next_event_time < now:
+            return 0
+
+        return next_event_time - now
 
 
 recommended_socket_opts = {

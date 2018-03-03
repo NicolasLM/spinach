@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
 
 import pytest
 
-from spinach.brokers.redis import RedisBroker, RUNNING_JOBS_KEY
+from spinach.brokers.redis import (
+    RedisBroker, RUNNING_JOBS_KEY, PERIODIC_TASKS_HASH_KEY
+)
 from spinach.job import Job, JobStatus
+from spinach.task import Task
 
 
 @pytest.fixture
@@ -67,3 +69,25 @@ def test_running_job(broker):
     broker.remove_job_from_running(job)
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     assert broker.get_jobs_from_queue('foo_queue', 1) == []
+
+
+def test_old_periodic_tasks(broker):
+    periodic_tasks_hash_key = broker._to_namespaced(PERIODIC_TASKS_HASH_KEY)
+    tasks = [
+        Task(print, 'foo', 'q1', 0, timedelta(seconds=5)),
+        Task(print, 'bar', 'q1', 0, timedelta(seconds=10))
+    ]
+
+    broker.register_periodic_tasks(tasks)
+    assert broker._r.hgetall(periodic_tasks_hash_key) == {
+        b'foo': b'{"max_retries": 0, "name": "foo", '
+                b'"periodicity": 5, "queue": "q1"}',
+        b'bar': b'{"max_retries": 0, "name": "bar", '
+                b'"periodicity": 10, "queue": "q1"}'
+    }
+
+    broker.register_periodic_tasks([tasks[1]])
+    assert broker._r.hgetall(periodic_tasks_hash_key) == {
+        b'bar': b'{"max_retries": 0, "name": "bar", '
+                b'"periodicity": 10, "queue": "q1"}'
+    }

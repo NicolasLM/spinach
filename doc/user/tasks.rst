@@ -89,6 +89,24 @@ allows to precisely control when it should be retried::
 
 .. autoclass:: spinach.task.RetryException
 
+Periodic tasks
+--------------
+
+Tasks marked as periodic get automatically scheduled. To run a task every 5
+seconds:
+
+.. literalinclude:: ../../examples/periodic.py
+
+Periodic tasks get scheduled by the workers themselves, there is no need to
+run an additional process only for that. Of course having multiple workers on
+multiple machine is fine and will not result in duplicated tasks.
+
+Periodic tasks run at most every `period`. If the system scheduling periodic
+tasks gets delayed, nothing compensates for the time lost. This has the added
+benefit of periodic tasks not being scheduled if all the workers are down for
+a prolonged amount of time. When they get back online, workers won't have a
+storm of periodic tasks to execute.
+
 Tasks Registry
 --------------
 

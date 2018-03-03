@@ -7,6 +7,7 @@ from spinach import const
 from spinach.brokers.memory import MemoryBroker
 from spinach.brokers.redis import RedisBroker
 from spinach.job import Job, JobStatus
+from spinach.task import Task
 from .conftest import get_now, set_now
 
 
@@ -93,3 +94,21 @@ def test_flush(broker):
 def test_repr(broker):
     assert broker.__class__.__name__ in repr(broker)
     assert str(broker._id) in repr(broker)
+
+
+def test_no_periodic_tasks(broker):
+    broker.register_periodic_tasks([])
+    assert broker.inspect_periodic_tasks() == []
+
+
+def test_periodic_tasks(broker):
+    tasks = [
+        Task(print, 'foo', 'q1', 0, timedelta(seconds=5)),
+        Task(print, 'bar', 'q1', 0, timedelta(seconds=10))
+    ]
+    broker.register_periodic_tasks(tasks)
+
+    r = broker.inspect_periodic_tasks()
+    assert r[0][1] == 'foo'
+    assert r[1][1] == 'bar'
+    assert r[0][0] == r[1][0] - 5

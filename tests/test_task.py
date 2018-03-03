@@ -1,4 +1,5 @@
 import copy
+from datetime import timedelta
 from unittest import mock
 
 import pytest
@@ -11,7 +12,7 @@ from .conftest import get_now
 
 @pytest.fixture
 def task():
-    return Task(print, 'write_to_stdout', 'foo_queue', 0)
+    return Task(print, 'write_to_stdout', 'foo_queue', 0, None)
 
 
 def test_task(task):
@@ -19,6 +20,7 @@ def test_task(task):
     assert task.name == 'write_to_stdout'
     assert task.queue == 'foo_queue'
     assert task.max_retries == 0
+    assert task.periodicity is None
 
     assert 'print' in repr(task)
     assert 'write_to_stdout' in repr(task)
@@ -51,6 +53,21 @@ def test_tasks_add(task):
     assert tasks.tasks == {
         'write_to_stdout': task
     }
+
+
+def test_task_serialize(task):
+    expected = (
+        '{"max_retries": 0, "name": "write_to_stdout", '
+        '"periodicity": null, "queue": "foo_queue"}'
+    )
+    assert task.serialize() == expected
+
+    task.periodicity = timedelta(minutes=5)
+    expected = (
+        '{"max_retries": 0, "name": "write_to_stdout", '
+        '"periodicity": 300, "queue": "foo_queue"}'
+    )
+    assert task.serialize() == expected
 
 
 def test_tasks_queues_and_max_retries():

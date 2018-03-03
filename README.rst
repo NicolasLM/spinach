@@ -12,11 +12,11 @@ Redis task queue for Python 3 heavily inspired by Celery and RQ.
 
 Distinctive features:
 
-- Threads first, workers are lightweight
-- Explicit, very little black magic that can bite you
-- Modern code in Python 3 and Lua
-- Workers are embeddable in regular processes for easy testing
-- See `Design choices
+- At-least-once or at-most-once delivery per task
+- Periodic tasks without an additional process
+- Scheduling of tasks in batch
+- Embeddable workers for easier testing
+- Python 3, threaded, explicit... see `design choices
   <https://spinach.readthedocs.io/en/latest/user/design.html>`_ for more
   details
 

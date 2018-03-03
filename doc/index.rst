@@ -7,11 +7,12 @@ Spinach is a Redis task queue for Python 3 heavily inspired by Celery and RQ.
 
 Distinctive features:
 
-- Threads first, workers are lightweight
-- Explicit, very little black magic that can bite you
-- Modern code in Python 3 and Lua
-- Workers are embeddable in regular processes for easy testing
-- See :ref:`Design choices <design>` for more details
+- At-least-once or at-most-once delivery per task
+- Periodic tasks without an additional process
+- Scheduling of tasks in batch
+- Embeddable workers for easier testing
+- Python 3, threaded, explicit... see :ref:`design choices <design>` for more
+  details
 
 Installation::
 

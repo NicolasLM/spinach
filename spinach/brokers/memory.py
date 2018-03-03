@@ -1,10 +1,14 @@
+from datetime import datetime, timezone
 from logging import getLogger
 from queue import Queue, Empty
+import sched
 import threading
-from typing import Optional, Iterable, List
+import time
+from typing import Optional, Iterable, List, Tuple
 
 from .base import Broker
 from ..job import Job, JobStatus
+from ..task import Task
 
 logger = getLogger('spinach.broker')
 
@@ -17,6 +21,7 @@ class MemoryBroker(Broker):
         self._queues = dict()
         self._future_jobs = list()
         self._running_jobs = list()
+        self._scheduler = sched.scheduler()
 
     def _get_queue(self, queue_name: str):
         queue_name = self._to_namespaced(queue_name)
@@ -56,7 +61,51 @@ class MemoryBroker(Broker):
                 num_jobs_moved += 1
 
                 job = self._get_next_future_job()
+        self._scheduler.run(blocking=False)
         return num_jobs_moved
+
+    def register_periodic_tasks(self, tasks: Iterable[Task]):
+        """Register tasks that need to be scheduled periodically."""
+        for task in tasks:
+            self._scheduler.enter(
+                int(task.periodicity.total_seconds()),
+                0,
+                self._schedule_periodic_task,
+                argument=(task,)
+            )
+
+    def _schedule_periodic_task(self, task: Task):
+        at = datetime.now(timezone.utc)
+        job = Job(task.name, task.queue, at, task.max_retries)
+        self.enqueue_jobs([job])
+        self._scheduler.enter(
+            int(task.periodicity.total_seconds()),
+            0,
+            self._schedule_periodic_task,
+            argument=(task,)
+        )
+
+    @property
+    def next_future_periodic_delta(self) -> Optional[float]:
+        """Give the amount of seconds before the next periodic task is due."""
+        try:
+            next_event = self._scheduler.queue[0]
+        except IndexError:
+            return None
+
+        now = time.monotonic()
+        next_event_time = next_event[0]
+        if next_event_time < now:
+            return 0
+
+        return next_event_time - now
+
+    def inspect_periodic_tasks(self) -> List[Tuple[int, str]]:
+        """Get the next periodic task schedule.
+
+        Used only for debugging and during tests.
+        """
+        return [(int(e[0]), e[3][0].name) for e in self._scheduler.queue]
 
     def _get_next_future_job(self)-> Optional[Job]:
         with self._lock:

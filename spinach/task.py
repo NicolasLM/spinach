@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import functools
+import json
 from typing import Optional, Callable, List
 from numbers import Number
 
@@ -8,18 +9,31 @@ from . import const, exc
 
 class Task:
 
-    __slots__ = ['func', 'name', 'queue', 'max_retries']
+    __slots__ = ['func', 'name', 'queue', 'max_retries', 'periodicity']
 
     def __init__(self, func: Callable, name: str, queue: str,
-                 max_retries: Number):
+                 max_retries: Number, periodicity: Optional[timedelta]):
         self.func = func
         self.name = name
         self.queue = queue
         self.max_retries = max_retries
+        self.periodicity = periodicity
+
+    def serialize(self):
+        periodicity = (int(self.periodicity.total_seconds())
+                       if self.periodicity else None)
+        return json.dumps({
+            'name': self.name,
+            'queue': self.queue,
+            'max_retries': self.max_retries,
+            'periodicity': periodicity
+        }, sort_keys=True)
 
     def __repr__(self):
-        return 'Task({}, {}, {}, {})'.format(self.func, self.name,
-                                             self.queue, self.max_retries)
+        return 'Task({}, {}, {}, {}, {})'.format(
+            self.func, self.name, self.queue, self.max_retries,
+            self.periodicity
+        )
 
     def __eq__(self, other):
         for attr in self.__slots__:
@@ -36,15 +50,19 @@ class Tasks:
 
     :arg queue: default queue for tasks
     :arg max_retries: default retry policy for tasks
+    :arg periodicity: for periodic tasks, delay between executions as a
+         timedelta
     """
     # This class is not thread-safe because it doesn't need to be used
     # concurrently.
 
     def __init__(self, queue: Optional[str]=None,
-                 max_retries: Optional[Number]=None):
+                 max_retries: Optional[Number]=None,
+                 periodicity: Optional[timedelta]=None):
         self._tasks = {}
         self.queue = queue
         self.max_retries = max_retries
+        self.periodicity = periodicity
         self._spin = None
 
     def update(self, tasks: 'Tasks'):
@@ -68,13 +86,16 @@ class Tasks:
         )
 
     def task(self, func: Optional[Callable]=None, name: Optional[str]=None,
-             queue: Optional[str]=None, max_retries: Optional[Number]=None):
+             queue: Optional[str]=None, max_retries: Optional[Number]=None,
+             periodicity: Optional[timedelta]=None):
         """Decorator to register a task function.
 
         :arg name: name of the task, used later to schedule jobs
         :arg queue: queue of the task, the default is used if not provided
         :arg max_retries: maximum number of retries, the default is used if
              not provided
+        :arg periodicity: for periodic tasks, delay between executions as a
+             timedelta
 
         >>> tasks = Tasks()
         >>> @tasks.task(name='foo')
@@ -83,18 +104,21 @@ class Tasks:
         """
         if func is None:
             return functools.partial(self.task, name=name, queue=queue,
-                                     max_retries=max_retries)
+                                     max_retries=max_retries,
+                                     periodicity=periodicity)
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             return func(*args, **kwargs)
 
-        self.add(func, name=name, queue=queue, max_retries=max_retries)
+        self.add(func, name=name, queue=queue, max_retries=max_retries,
+                 periodicity=periodicity)
 
         return wrapper
 
     def add(self, func: Callable, name: Optional[str]=None,
-            queue: Optional[str]=None, max_retries: Optional[Number]=None):
+            queue: Optional[str]=None, max_retries: Optional[Number]=None,
+            periodicity: Optional[timedelta]=None):
         """Register a task function.
 
         :arg func: a callable to be executed
@@ -102,6 +126,8 @@ class Tasks:
         :arg queue: queue of the task, the default is used if not provided
         :arg max_retries: maximum number of retries, the default is used if
              not provided
+        :arg periodicity: for periodic tasks, delay between executions as a
+             timedelta
 
         >>> tasks = Tasks()
         >>> tasks.add(lambda x: x, name='do_nothing')
@@ -123,11 +149,14 @@ class Tasks:
             else:
                 max_retries = const.DEFAULT_MAX_RETRIES
 
+        if periodicity is None:
+            periodicity = self.periodicity
+
         if queue and queue.startswith('_'):
             raise ValueError('Queues starting with "_" are reserved by '
                              'Spinach for internal use')
 
-        self._tasks[name] = Task(func, name, queue, max_retries)
+        self._tasks[name] = Task(func, name, queue, max_retries, periodicity)
 
     def _require_attached_tasks(self):
         if self._spin is None:

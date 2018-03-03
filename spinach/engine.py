@@ -36,7 +36,6 @@ class Engine:
         self._arbiter = None
         self._workers = None
         self._working_queue = None
-
         self._must_stop = threading.Event()
 
     @property
@@ -106,6 +105,7 @@ class Engine:
 
     def _arbiter_func(self):
         logger.debug('Arbiter started')
+        self._register_periodic_tasks()
         while not self._must_stop.is_set():
 
             self._broker.move_future_jobs()
@@ -220,3 +220,8 @@ class Engine:
             job.max_retries + 1, job.max_retries + 1, job, duration
         )
         self._broker.remove_job_from_running(job)
+
+    def _register_periodic_tasks(self):
+        periodic_tasks = [task for task in self._tasks.tasks.values()
+                          if task.periodicity]
+        self._broker.register_periodic_tasks(periodic_tasks)

@@ -13,7 +13,7 @@ install:
 
 script:
     - pytest -v --cov=spinach tests/
-    - pycodestyle spinach tests
+    - pycodestyle --ignore=E252,W503,W504 spinach tests
 
 after_success:
   - pip install python-coveralls

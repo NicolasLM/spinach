@@ -190,7 +190,7 @@ class RedisBroker(Broker):
         """
         rv = self._r.zrangebyscore(
             self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
-            '-inf',  '+inf', withscores=True
+            '-inf', '+inf', withscores=True
         )
         return [(int(r[1]), r[0].decode()) for r in rv]
 
@@ -199,7 +199,7 @@ class RedisBroker(Broker):
         """Give the amount of seconds before the next periodic task is due."""
         rv = self._r.zrangebyscore(
             self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
-            '-inf',  '+inf', start=0, num=1, withscores=True,
+            '-inf', '+inf', start=0, num=1, withscores=True,
             score_cast_func=int
         )
         if not rv:

@@ -183,7 +183,11 @@ class Engine:
         if not err:
             job.status = JobStatus.SUCCEEDED
             logger.info('Finished execution of %s in %s', job, duration)
-            self._broker.remove_job_from_running(job)
+            try:
+                self._broker.remove_job_from_running(job)
+            except Exception as e:
+                logger.warning('Could not remove %s from running jobs: %s',
+                               job, e)
             return
 
         if job.should_retry:
@@ -196,7 +200,14 @@ class Engine:
 
             signals.job_schedule_retry.send(self._namespace, job=job, err=err)
             # No need to remove job from running, enqueue does it
-            self._broker.enqueue_jobs([job])
+            try:
+                self._broker.enqueue_jobs([job])
+            except Exception as e:
+                logger.warning(
+                    'Could not schedule the retry of %s, however it will be '
+                    'retried when the broker is found dead: %s', job, e
+                )
+                return
 
             log_args = (
                 job.retries, job.max_retries + 1, job, duration,
@@ -219,7 +230,10 @@ class Engine:
             'Error during execution %d/%d of %s after %s',
             job.max_retries + 1, job.max_retries + 1, job, duration
         )
-        self._broker.remove_job_from_running(job)
+        try:
+            self._broker.remove_job_from_running(job)
+        except Exception as e:
+            logger.warning('Could not remove %s from running jobs: %s', job, e)
 
     def _register_periodic_tasks(self):
         periodic_tasks = [task for task in self._tasks.tasks.values()

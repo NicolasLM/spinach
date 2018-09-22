@@ -48,7 +48,10 @@ class RedisBroker(Broker):
         self._register_periodic_tasks = self._load_script(
             'register_periodic_tasks.lua'
         )
+        self._reset()
 
+    def _reset(self):
+        """Initialization that must happen before the broker is (re)started."""
         self._subscriber_thread = None
         self._must_stop = threading.Event()
 
@@ -168,6 +171,8 @@ class RedisBroker(Broker):
     def stop(self):
         super().stop()
         self._must_stop.set()
+        self._subscriber_thread.join()
+        self._reset()
 
     def flush(self):
         self._run_script(self._flush, self.namespace)

@@ -125,8 +125,7 @@ def test_start_workers_twice(spin):
         spin.start_workers()
 
 
-@patch('spinach.engine.time.sleep', side_effect=[None, KeyboardInterrupt])
-def test_start_workers_blocking(_):
+def test_start_workers_blocking():
     spin = Engine(MemoryBroker(), namespace='tests')
-    spin.start_workers(number=1, block=True)
-    assert spin._must_stop.is_set()
+    spin.start_workers(number=1, block=True, stop_when_queue_empty=True)
+    assert not spin._must_stop.is_set()

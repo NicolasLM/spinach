@@ -17,13 +17,14 @@ def human_duration(duration_seconds: float) -> str:
     return '{} s'.format(int(duration_seconds))
 
 
-def run_forever(func: Callable, must_stop: Event, logger: Logger):
+def run_forever(func: Callable, must_stop: Event, logger: Logger,
+                *args, **kwargs):
     attempt = 0
     while not must_stop.is_set():
 
         start = time.monotonic()
         try:
-            func()
+            func(*args, **kwargs)
         except Exception as e:
 
             # Reset the attempt counter if `func` ran for 10 minutes without

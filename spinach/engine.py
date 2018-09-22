@@ -32,7 +32,10 @@ class Engine:
 
         self._tasks = Tasks()
         self.task = self._tasks.task
+        self._reset()
 
+    def _reset(self):
+        """Initialization that must happen before the arbiter is (re)started"""
         self._arbiter = None
         self._workers = None
         self._working_queue = None
@@ -103,7 +106,7 @@ class Engine:
             )
         return self._broker.enqueue_jobs(jobs)
 
-    def _arbiter_func(self):
+    def _arbiter_func(self, stop_when_queue_empty=False):
         logger.debug('Arbiter started')
         self._register_periodic_tasks()
         while not self._must_stop.is_set():
@@ -125,22 +128,33 @@ class Engine:
                     else:
                         self._workers.submit_job(job)
 
+                if (stop_when_queue_empty and available_slots > 0
+                        and received_jobs == 0):
+                    logger.info("Stopping workers because queue '%s' is empty",
+                                self._working_queue)
+                    self.stop_workers(_join_arbiter=False)
+                    logger.debug('Arbiter terminated')
+                    return
+
             logger.debug('Received %s jobs, now waiting for events',
                          received_jobs)
             self._broker.wait_for_event()
 
         logger.debug('Arbiter terminated')
 
-    def start_workers(self, number: int=5, queue=DEFAULT_QUEUE, block=True):
+    def start_workers(self, number: int=5, queue=DEFAULT_QUEUE, block=True,
+                      stop_when_queue_empty=False):
         """Start the worker threads.
 
         :arg number: number of worker threads to launch
         :arg queue: name of the queue to consume, see :doc:`queues`
         :arg block: whether to block the calling thread until a signal arrives
              and workers get terminated
+        :arg stop_when_queue_empty: automatically stop the workers when the
+             queue is empty. Useful mostly for one-off scripts and testing.
         """
         if self._arbiter or self._workers:
-            raise RuntimeError('Workers can only be started once')
+            raise RuntimeError('Workers are already running')
 
         self._working_queue = queue
 
@@ -157,24 +171,33 @@ class Engine:
         # Start the arbiter
         self._arbiter = threading.Thread(
             target=run_forever,
-            args=(self._arbiter_func, self._must_stop, logger),
+            args=(self._arbiter_func, self._must_stop, logger,
+                  stop_when_queue_empty),
             name='{}-arbiter'.format(self.namespace)
         )
         self._arbiter.start()
 
         if block:
             try:
-                while True:
-                    time.sleep(20000)
+                self._arbiter.join()
             except KeyboardInterrupt:
                 self.stop_workers()
+            except AttributeError:
+                # Arbiter thread starts and stops immediately when ran with
+                # `stop_when_queue_empty` and queue is already empty.
+                pass
 
-    def stop_workers(self):
+    def stop_workers(self, _join_arbiter=True):
         """Stop the workers and wait for them to terminate."""
+        # _join_arbiter is used internally when the arbiter is shutting down
+        # the full engine itself. This is because the arbiter thread cannot
+        # join itself.
         self._must_stop.set()
         self._workers.stop()
         self._broker.stop()
-        self._arbiter.join()
+        if _join_arbiter:
+            self._arbiter.join()
+        self._reset()
 
     def _job_finished_callback(self, job: Job, duration: float,
                                err: Optional[Exception]):

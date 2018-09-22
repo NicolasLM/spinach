@@ -24,4 +24,4 @@ def slow():
 spin.schedule('slow')
 spin.schedule('fast')
 
-spin.start_workers(number=1, queue='high-priority')
+spin.start_workers(number=1, queue='high-priority', stop_when_queue_empty=True)

@@ -107,14 +107,10 @@ class Tasks:
                                      max_retries=max_retries,
                                      periodicity=periodicity)
 
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-
         self.add(func, name=name, queue=queue, max_retries=max_retries,
                  periodicity=periodicity)
 
-        return wrapper
+        return func
 
     def add(self, func: Callable, name: Optional[str]=None,
             queue: Optional[str]=None, max_retries: Optional[Number]=None,

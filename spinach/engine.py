@@ -157,6 +157,13 @@ class Engine:
 
         self._working_queue = queue
 
+        tasks_names = '\n'.join(
+            ['  - ' + task.name for task in self._tasks.tasks.values()
+             if task.queue == self._working_queue]
+        )
+        logger.info('Starting %d workers on queue "%s" with tasks:\n%s',
+                    number, self._working_queue, tasks_names)
+
         # Start the broker
         self._broker.start()
 

@@ -1,13 +1,14 @@
+from collections import namedtuple
 from logging import getLogger
 from queue import Queue
 import threading
 import time
-from typing import Callable
 
 from .job import Job
 from . import signals
 
 logger = getLogger(__name__)
+JobResult = namedtuple('JobResult', 'job, duration, error')
 
 
 class MaxUnfinishedQueue(Queue):
@@ -32,17 +33,16 @@ class MaxUnfinishedQueue(Queue):
 
 class Workers:
 
-    def __init__(self, job_finished_callback: Callable,
-                 num_workers: int, namespace: str):
-        self._queue = MaxUnfinishedQueue(maxsize=num_workers)
+    def __init__(self, num_workers: int, namespace: str):
+        self._in_queue = MaxUnfinishedQueue(maxsize=num_workers)
+        self.out_queue = Queue()
         self._namespace = namespace.format(namespace)
-        self._job_finished_callback = job_finished_callback
         self._threads = list()
 
         # The event exists only to stop accepting jobs, workers are terminated
         # via the poison pill
         self._must_stop = threading.Event()
-        self._poison_pill = object()
+        self.poison_pill = object()
 
         for i in range(num_workers):
             thread = threading.Thread(
@@ -58,11 +58,11 @@ class Workers:
         signals.worker_started.send(self._namespace, worker_name=worker_name)
 
         while True:
-            item = self._queue.get()
+            item = self._in_queue.get()
 
-            if item is self._poison_pill:
-                self._queue.task_done()
-                self._queue.put(self._poison_pill)
+            if item is self.poison_pill:
+                self._in_queue.task_done()
+                self._in_queue.put(self.poison_pill)
                 break
 
             job = item
@@ -73,13 +73,13 @@ class Workers:
                 job.task_func(*job.task_args, **job.task_kwargs)
             except Exception as e:
                 duration = time.monotonic() - start_time
-                self._job_finished_callback(job, duration, e)
+                self.out_queue.put(JobResult(job, duration, e))
             else:
                 duration = time.monotonic() - start_time
-                self._job_finished_callback(job, duration, None)
+                self.out_queue.put(JobResult(job, duration, None))
             finally:
                 signals.job_finished.send(self._namespace, job=job)
-                self._queue.task_done()
+                self._in_queue.task_done()
 
         logger.debug('Worker %s terminated', worker_name)
         signals.worker_terminated.send(self._namespace,
@@ -88,7 +88,7 @@ class Workers:
     def submit_job(self, job: Job):
         if self._must_stop.is_set():
             raise RuntimeError('Cannot submit job: workers are shutting down')
-        self._queue.put(job)
+        self._in_queue.put(job)
 
     @property
     def available_slots(self) -> int:
@@ -97,7 +97,7 @@ class Workers:
         It may be racy, but it should not be a problem here as jobs are
         only submitted by a single thread (the arbiter).
         """
-        return self._queue.available_slots()
+        return self._in_queue.available_slots()
 
     def can_accept_job(self) -> bool:
         return self.available_slots > 0
@@ -108,8 +108,9 @@ class Workers:
             return
         logger.info('Stopping workers %s', self._namespace)
         self._must_stop.set()
-        self._queue.join()
-        self._queue.put(self._poison_pill)
+        self._in_queue.join()
+        self._in_queue.put(self.poison_pill)
         for thread in self._threads:
             thread.join()
+        self.out_queue.put(self.poison_pill)
         logger.debug('All workers %s stopped', self._namespace)

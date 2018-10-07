@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from logging import getLogger
 import threading
-import time
 from typing import Optional
 
 from .task import Tasks, Batch, RetryException
@@ -163,10 +162,17 @@ class Engine:
 
         # Start workers
         self._workers = Workers(
-            self._job_finished_callback,
             num_workers=number,
             namespace=self.namespace,
         )
+
+        # Start the result notifier
+        self._result_notifier = threading.Thread(
+            target=run_forever,
+            args=(self._result_notifier_func, self._must_stop, logger),
+            name='{}-result-notifier'.format(self.namespace)
+        )
+        self._result_notifier.start()
 
         # Start the arbiter
         self._arbiter = threading.Thread(
@@ -194,10 +200,25 @@ class Engine:
         # join itself.
         self._must_stop.set()
         self._workers.stop()
+        self._result_notifier.join()
         self._broker.stop()
         if _join_arbiter:
             self._arbiter.join()
         self._reset()
+
+    def _result_notifier_func(self):
+        logger.debug('Result notifier started')
+
+        while not self._must_stop.is_set():
+            out_object = self._workers.out_queue.get()
+            if out_object is self._workers.poison_pill:
+                break
+
+            self._job_finished_callback(
+                out_object.job, out_object.duration, out_object.error
+            )
+
+        logger.debug('Result notifier terminated')
 
     def _job_finished_callback(self, job: Job, duration: float,
                                err: Optional[Exception]):
@@ -249,9 +270,10 @@ class Engine:
 
         job.status = JobStatus.FAILED
         signals.job_failed.send(self._namespace, job=job, err=err)
-        logger.exception(
+        logger.error(
             'Error during execution %d/%d of %s after %s',
-            job.max_retries + 1, job.max_retries + 1, job, duration
+            job.max_retries + 1, job.max_retries + 1, job, duration,
+            exc_info=err
         )
         try:
             self._broker.remove_job_from_running(job)

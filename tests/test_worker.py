@@ -5,17 +5,14 @@ import time
 import pytest
 
 from spinach import signals
-from spinach.worker import MaxUnfinishedQueue, Workers
+from spinach.worker import MaxUnfinishedQueue, Workers, JobResult
 from spinach.job import Job
 
 
 @pytest.fixture
 def workers():
-    callback = Mock()
-    workers = Workers(callback, 2, 'tests')
-
-    yield workers, callback
-
+    workers = Workers(2, 'tests')
+    yield workers
     workers.stop()
 
 
@@ -31,9 +28,11 @@ def job():
 
 def wait_for_queue_empty(workers: Workers, timeout=10):
     for _ in range(timeout * 10):
-        if workers._queue.empty():
+        if workers._in_queue.empty():
             return
+
         time.sleep(0.1)
+
     raise RuntimeError('Queue did not get empty after {}s'.format(timeout))
 
 
@@ -69,7 +68,6 @@ def test_max_unfinished_queue():
 
 
 def test_job_execution(workers, job):
-    workers, callback = workers
     job, task_func = job
     assert workers.can_accept_job()
 
@@ -78,12 +76,11 @@ def test_job_execution(workers, job):
 
     # Executed function raised no error
     task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
-    callback.assert_called_once_with(job, ANY, None)
+    assert workers.out_queue.get() == JobResult(job, ANY, None)
     assert workers.can_accept_job()
 
 
 def test_job_execution_exception(workers, job):
-    workers, callback = workers
     job, task_func = job
 
     # Executed function raised an error
@@ -94,11 +91,10 @@ def test_job_execution_exception(workers, job):
     wait_for_queue_empty(workers)
 
     task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
-    callback.assert_called_once_with(job, ANY, error)
+    assert workers.out_queue.get() == JobResult(job, ANY, error)
 
 
 def test_submit_job_shutdown_workers(workers, job):
-    workers, callback = workers
     job, task_func = job
     workers.stop()
     with pytest.raises(RuntimeError):
@@ -107,10 +103,8 @@ def test_submit_job_shutdown_workers(workers, job):
 
 @pytest.mark.parametrize('number', [0, 5])
 def test_start_stop_n_workers(number):
-    callback = Mock()
-
-    workers = Workers(callback, number, 'tests')
-    assert workers._queue.maxsize == number
+    workers = Workers(number, 'tests')
+    assert workers._in_queue.maxsize == number
     assert len(workers._threads) == number
     for thread in workers._threads:
         assert 'tests-worker-' in thread.name
@@ -120,7 +114,6 @@ def test_start_stop_n_workers(number):
 
 def test_worker_signals(job):
     job, task_func = job
-    callback = Mock()
 
     mock_job_started_receiver = Mock(spec={})
     signals.job_started.connect(mock_job_started_receiver)
@@ -135,7 +128,7 @@ def test_worker_signals(job):
     signals.worker_terminated.connect(mock_worker_terminated_receiver)
 
     ns = 'tests'
-    workers = Workers(callback, 1, ns)
+    workers = Workers(1, ns)
     workers.submit_job(job)
     wait_for_queue_empty(workers)
     workers.stop()
@@ -151,7 +144,6 @@ def test_worker_signals(job):
 
 
 def test_can_accept_job(workers, job):
-    workers, callback = workers
     assert workers.available_slots == 2
 
     workers.submit_job(job)

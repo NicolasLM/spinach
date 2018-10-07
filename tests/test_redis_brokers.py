@@ -79,6 +79,7 @@ def test_old_periodic_tasks(broker):
     ]
 
     broker.register_periodic_tasks(tasks)
+    assert broker._number_periodic_tasks == 2
     assert broker._r.hgetall(periodic_tasks_hash_key) == {
         b'foo': b'{"max_retries": 0, "name": "foo", '
                 b'"periodicity": 5, "queue": "q1"}',
@@ -87,6 +88,7 @@ def test_old_periodic_tasks(broker):
     }
 
     broker.register_periodic_tasks([tasks[1]])
+    assert broker._number_periodic_tasks == 1
     assert broker._r.hgetall(periodic_tasks_hash_key) == {
         b'bar': b'{"max_retries": 0, "name": "bar", '
                 b'"periodicity": 10, "queue": "q1"}'

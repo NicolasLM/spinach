@@ -54,6 +54,7 @@ class RedisBroker(Broker):
         """Initialization that must happen before the broker is (re)started."""
         self._subscriber_thread = None
         self._must_stop = threading.Event()
+        self._number_periodic_tasks = 0
 
     def _load_script(self, filename: str) -> Script:
         with open(path.join(here, 'redis_scripts', filename), mode='rb') as f:
@@ -104,7 +105,7 @@ class RedisBroker(Broker):
             JobStatus.QUEUED.value,
             self._to_namespaced(PERIODIC_TASKS_HASH_KEY),
             self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
-            *[str(uuid.uuid4()) for _ in range(10)]
+            *[str(uuid.uuid4()) for _ in range(self._number_periodic_tasks)]
         )
         logger.debug("Redis moved %s job(s) from future to current queues",
                      num_jobs_moved)
@@ -180,6 +181,7 @@ class RedisBroker(Broker):
     def register_periodic_tasks(self, tasks: Iterable[Task]):
         """Register tasks that need to be scheduled periodically."""
         tasks = [task.serialize() for task in tasks]
+        self._number_periodic_tasks = len(tasks)
         self._run_script(
             self._register_periodic_tasks,
             math.ceil(datetime.now(timezone.utc).timestamp()),

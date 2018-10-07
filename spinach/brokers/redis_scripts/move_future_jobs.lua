@@ -16,7 +16,8 @@ local jobs_json = redis.call('zrangebyscore', future_jobs, '-inf', now, 'LIMIT',
 local jobs_moved = 0
 
 -- Create jobs from due periodic tasks
-local task_names = redis.call('zrangebyscore', periodic_tasks_queue, '-inf', now, 'LIMIT', 0, 10)
+local number_of_uuids = #ARGV + 1 - 9  -- as uuids start at ARGV[9]
+local task_names = redis.call('zrangebyscore', periodic_tasks_queue, '-inf', now, 'LIMIT', 0, number_of_uuids)
 for i, task_name in ipairs(task_names) do
 
     local task_json = redis.call('hget', periodic_tasks_hash, task_name)

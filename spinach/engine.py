@@ -7,7 +7,7 @@ from .task import Tasks, Batch, RetryException
 from .utils import human_duration, run_forever, exponential_backoff
 from .job import Job, JobStatus
 from .brokers.base import Broker
-from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE
+from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE, DEFAULT_WORKER_NUMBER
 from .worker import Workers
 from . import signals, exc
 
@@ -141,7 +141,8 @@ class Engine:
 
         logger.debug('Arbiter terminated')
 
-    def start_workers(self, number: int=5, queue=DEFAULT_QUEUE, block=True,
+    def start_workers(self, number: int=DEFAULT_WORKER_NUMBER,
+                      queue=DEFAULT_QUEUE, block=True,
                       stop_when_queue_empty=False):
         """Start the worker threads.
 

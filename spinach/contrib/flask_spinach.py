@@ -24,8 +24,9 @@ class Spinach:
         namespace = app.extensions['spinach'].namespace
 
         @app.cli.command(name='spinach')
+        @click.option('--stop-when-queue-empty', is_flag=True, default=False)
         @click.argument('queue', default=DEFAULT_QUEUE)
-        def spinach_run_workers(queue):
+        def spinach_run_workers(queue, stop_when_queue_empty):
 
             # If the application uses the Flask/Raven extension, use its
             # raven client for the integration Spinach/Raven
@@ -35,7 +36,8 @@ class Spinach:
 
             self.spin.start_workers(
                 number=app.config['SPINACH_WORKER_NUMBER'],
-                queue=queue
+                queue=queue,
+                stop_when_queue_empty=stop_when_queue_empty
             )
 
         @signals.job_started.connect_via(namespace)
@@ -58,7 +60,11 @@ class Spinach:
                                'Did you forget to call init_app?')
 
     def register_tasks(self, app, tasks):
-        app.extensions['spinach'].attach_tasks(tasks)
+        try:
+            app.extensions['spinach'].attach_tasks(tasks)
+        except KeyError:
+            raise RuntimeError('Spinach extension not initialized. '
+                               'Did you forget to call init_app?')
 
     # Convenience access to common Engine attributes and methods
 

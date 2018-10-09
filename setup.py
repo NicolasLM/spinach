@@ -51,7 +51,8 @@ setup(
             'pytest',
             'pytest-cov',
             'pytest-threadleak',
-            'pycodestyle'
+            'pycodestyle',
+            'flask'
         ],
     },
 

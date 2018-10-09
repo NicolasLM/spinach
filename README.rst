@@ -15,7 +15,7 @@ Distinctive features:
 - At-least-once or at-most-once delivery per task
 - Periodic tasks without an additional process
 - Scheduling of tasks in batch
-- Integrations with `Flask, Logging and Sentry
+- Integrations with `Flask, Django, Logging and Sentry
   <https://spinach.readthedocs.io/en/stable/user/integrations.html>`_
 - Embeddable workers for easier testing
 - Python 3, threaded, explicit... see `design choices

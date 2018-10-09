@@ -52,7 +52,8 @@ setup(
             'pytest-cov',
             'pytest-threadleak',
             'pycodestyle',
-            'flask'
+            'flask',
+            'django'
         ],
     },
 

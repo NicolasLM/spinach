@@ -104,6 +104,90 @@ imaginary ``auth`` Blueprint containing routes and tasks.
     def send_welcome_email():
         print('Sending email...')
 
+Django
+------
+
+A Django application is available for integrating Spinach into Django
+projects.
+
+To get started, add the application ``spinach.contrib.spinachd`` to
+``settings.py``::
+
+    INSTALLED_APPS = (
+        ...
+        'spinach.contrib.spinachd',
+    )
+
+On startup, Spinach will look for a ``tasks.py`` module in all installed
+applications. For instance ``polls/tasks.py``::
+
+    from spinach import Tasks
+
+    from .models import Question
+
+    tasks = Tasks()
+
+
+    @tasks.task(name='polls:close_poll')
+    def close_poll(question_id: int):
+        Question.objects.get(pk=question_id).delete()
+
+Tasks can be easily scheduled from views::
+
+    from .models import Question
+    from .tasks import tasks
+
+    def close_poll_view(request, question_id):
+        question = get_object_or_404(Question, pk=question_id)
+        tasks.schedule('polls:close_poll', question.id)
+
+Workers can be launched from ``manage.py``::
+
+    $ python manage.py spinach
+
+Users of the Django Sentry app get their errors sent to Sentry
+automatically in task workers.
+
+Sending emails in the background
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Spinach app provides an ``EMAIL_BACKEND`` allowing to send emails as
+background tasks. To use it simply add it to ``settings.py``::
+
+    EMAIL_BACKEND = 'spinach.contrib.spinachd.mail.BackgroundEmailBackend'
+    SPINACH_ACTUAL_EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+Emails can then be sent using regular Django functions::
+
+    from django.core.mail import send_mail
+
+    send_mail('Subject', 'Content', 'sender@example.com', ['receiver@example.com'])
+
+Periodically clearing expired sessions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Projects using ``django.contrib.sessions`` must remove expired session from the
+database from time to time. Django comes with a management command to do that
+manually, but this can be automated.
+
+Spinach provides a periodic task, disabled by default, to do that. To enable it
+give it a periodicity in ``settings.py``. For instance to clear sessions once
+per week::
+
+    from datetime import timedelta
+
+    SPINACH_CLEAR_SESSIONS_PERIODICITY = timedelta(weeks=1)
+
+Configuration
+~~~~~~~~~~~~~
+
+- ``SPINACH_BROKER``, default ``spinach.RedisBroker()``
+- ``SPINACH_NAMESPACE``, default ``spinach``
+- ``SPINACH_WORKER_NUMBER``, default 5 threads
+- ``SPINACH_ACTUAL_EMAIL_BACKEND``, default
+  ``django.core.mail.backends.smtp.EmailBackend``
+- ``SPINACH_CLEAR_SESSIONS_PERIODICITY``, default ``None`` (disabled)
+
 Sentry
 ------
 

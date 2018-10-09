@@ -11,7 +11,7 @@ Distinctive features:
 - Periodic tasks without an additional process
 - Scheduling of tasks in batch
 - Embeddable workers for easier testing
-- Integrations with :ref:`Flask, Logging and Sentry <integrations>`
+- Integrations with :ref:`Flask, Django, Logging and Sentry <integrations>`
 - Python 3, threaded, explicit... see :ref:`design choices <design>` for more
   details
 

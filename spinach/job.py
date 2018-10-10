@@ -6,6 +6,10 @@ import math
 from typing import Optional
 import uuid
 
+from . import signals
+from .task import RetryException
+from .utils import human_duration, exponential_backoff
+
 logger = getLogger(__name__)
 
 
@@ -143,3 +147,51 @@ class Job:
                 return False
 
         return True
+
+
+def advance_job_status(namespace: str, job: Job, duration: float,
+                       err: Optional[Exception]):
+    """Advance the status of a job depending on its execution.
+
+    This function is called after a job has been executed. It calculates its
+    next status and calls the appropriate signals.
+    """
+    duration = human_duration(duration)
+    if not err:
+        job.status = JobStatus.SUCCEEDED
+        logger.info('Finished execution of %s in %s', job, duration)
+        return
+
+    if job.should_retry:
+        job.status = JobStatus.NOT_SET
+        job.retries += 1
+        if isinstance(err, RetryException) and err.at is not None:
+            job.at = err.at
+        else:
+            job.at = (datetime.now(timezone.utc) +
+                      exponential_backoff(job.retries))
+
+        signals.job_schedule_retry.send(namespace, job=job, err=err)
+
+        log_args = (
+            job.retries, job.max_retries + 1, job, duration,
+            human_duration(
+                (job.at - datetime.now(tz=timezone.utc)).total_seconds()
+            )
+        )
+        if isinstance(err, RetryException):
+            logger.info('Retry requested during execution %d/%d of %s '
+                        'after %s, retry in %s', *log_args)
+        else:
+            logger.warning('Error during execution %d/%d of %s after %s, '
+                           'retry in %s', *log_args)
+
+        return
+
+    job.status = JobStatus.FAILED
+    signals.job_failed.send(namespace, job=job, err=err)
+    logger.error(
+        'Error during execution %d/%d of %s after %s',
+        job.max_retries + 1, job.max_retries + 1, job, duration,
+        exc_info=err
+    )

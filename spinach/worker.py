@@ -1,14 +1,12 @@
-from collections import namedtuple
 from logging import getLogger
 from queue import Queue
 import threading
 import time
 
-from .job import Job
 from . import signals
+from .job import Job, advance_job_status
 
 logger = getLogger(__name__)
-JobResult = namedtuple('JobResult', 'job, duration, error')
 
 
 class MaxUnfinishedQueue(Queue):
@@ -34,8 +32,11 @@ class MaxUnfinishedQueue(Queue):
 class Workers:
 
     def __init__(self, num_workers: int, namespace: str):
+        # in_queue receives Job objects to execute
+        # out_queue send Job objects after execution
         self._in_queue = MaxUnfinishedQueue(maxsize=num_workers)
         self.out_queue = Queue()
+
         self._namespace = namespace.format(namespace)
         self._threads = list()
 
@@ -73,12 +74,13 @@ class Workers:
                 job.task_func(*job.task_args, **job.task_kwargs)
             except Exception as e:
                 duration = time.monotonic() - start_time
-                self.out_queue.put(JobResult(job, duration, e))
+                advance_job_status(self._namespace, job, duration, e)
             else:
                 duration = time.monotonic() - start_time
-                self.out_queue.put(JobResult(job, duration, None))
+                advance_job_status(self._namespace, job, duration, None)
             finally:
                 signals.job_finished.send(self._namespace, job=job)
+                self.out_queue.put(job)
                 self._in_queue.task_done()
 
         logger.debug('Worker %s terminated', worker_name)

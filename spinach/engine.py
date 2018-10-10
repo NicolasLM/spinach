@@ -1,17 +1,14 @@
 from datetime import datetime, timezone
 from logging import getLogger
 import threading
-from typing import Optional
 
-from .task import Tasks, Batch, RetryException
-from .utils import (
-    human_duration, run_forever, exponential_backoff, handle_sigterm
-)
-from .job import Job, JobStatus
+from .task import Tasks, Batch
+from .utils import run_forever, handle_sigterm
+from .job import Job, JobStatus, advance_job_status
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE, DEFAULT_WORKER_NUMBER
 from .worker import Workers
-from . import signals, exc
+from . import exc
 
 
 logger = getLogger(__name__)
@@ -125,7 +122,12 @@ class Engine:
                     try:
                         job.task_func = self._tasks.get(job.task_name).func
                     except exc.UnknownTask as err:
-                        self._job_finished_callback(job, 0.0, err)
+                        # This is slightly cheating, when a task is unknown
+                        # it doesn't go to workers but is still sent to the
+                        # workers out_queue so that it is processed by the
+                        # notifier.
+                        advance_job_status(self.namespace, job, 0.0, err)
+                        self._workers.out_queue.put(job)
                     else:
                         self._workers.submit_job(job)
 
@@ -221,75 +223,18 @@ class Engine:
         logger.debug('Result notifier started')
 
         while not self._must_stop.is_set():
-            out_object = self._workers.out_queue.get()
-            if out_object is self._workers.poison_pill:
+            job = self._workers.out_queue.get()
+            if job is self._workers.poison_pill:
                 break
 
-            self._job_finished_callback(
-                out_object.job, out_object.duration, out_object.error
-            )
+            if job.status in (JobStatus.SUCCEEDED, JobStatus.FAILED):
+                self._broker.remove_job_from_running(job)
+            elif job.status is JobStatus.NOT_SET:
+                self._broker.enqueue_jobs([job])
+            else:
+                raise RuntimeError('Received job with an incorrect status')
 
         logger.debug('Result notifier terminated')
-
-    def _job_finished_callback(self, job: Job, duration: float,
-                               err: Optional[Exception]):
-        """Function called by a worker when a job is finished."""
-        duration = human_duration(duration)
-        if not err:
-            job.status = JobStatus.SUCCEEDED
-            logger.info('Finished execution of %s in %s', job, duration)
-            try:
-                self._broker.remove_job_from_running(job)
-            except Exception as e:
-                logger.warning('Could not remove %s from running jobs: %s',
-                               job, e)
-            return
-
-        if job.should_retry:
-            job.retries += 1
-            if isinstance(err, RetryException) and err.at is not None:
-                job.at = err.at
-            else:
-                job.at = (datetime.now(timezone.utc) +
-                          exponential_backoff(job.retries))
-
-            signals.job_schedule_retry.send(self._namespace, job=job, err=err)
-            # No need to remove job from running, enqueue does it
-            try:
-                self._broker.enqueue_jobs([job])
-            except Exception as e:
-                logger.warning(
-                    'Could not schedule the retry of %s, however it will be '
-                    'retried when the broker is found dead: %s', job, e
-                )
-                return
-
-            log_args = (
-                job.retries, job.max_retries + 1, job, duration,
-                human_duration(
-                    (job.at - datetime.now(tz=timezone.utc)).total_seconds()
-                )
-            )
-            if isinstance(err, RetryException):
-                logger.info('Retry requested during execution %d/%d of %s '
-                            'after %s, retry in %s', *log_args)
-            else:
-                logger.warning('Error during execution %d/%d of %s after %s, '
-                               'retry in %s', *log_args)
-
-            return
-
-        job.status = JobStatus.FAILED
-        signals.job_failed.send(self._namespace, job=job, err=err)
-        logger.error(
-            'Error during execution %d/%d of %s after %s',
-            job.max_retries + 1, job.max_retries + 1, job, duration,
-            exc_info=err
-        )
-        try:
-            self._broker.remove_job_from_running(job)
-        except Exception as e:
-            logger.warning('Could not remove %s from running jobs: %s', job, e)
 
     def _register_periodic_tasks(self):
         periodic_tasks = [task for task in self._tasks.tasks.values()

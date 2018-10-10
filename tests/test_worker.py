@@ -5,7 +5,7 @@ import time
 import pytest
 
 from spinach import signals
-from spinach.worker import MaxUnfinishedQueue, Workers, JobResult
+from spinach.worker import MaxUnfinishedQueue, Workers
 from spinach.job import Job
 
 
@@ -76,7 +76,7 @@ def test_job_execution(workers, job):
 
     # Executed function raised no error
     task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
-    assert workers.out_queue.get() == JobResult(job, ANY, None)
+    assert workers.out_queue.get() is job
     assert workers.can_accept_job()
 
 
@@ -91,7 +91,7 @@ def test_job_execution_exception(workers, job):
     wait_for_queue_empty(workers)
 
     task_func.assert_called_once_with(*job.task_args, **job.task_kwargs)
-    assert workers.out_queue.get() == JobResult(job, ANY, error)
+    assert workers.out_queue.get() is job
 
 
 def test_submit_job_shutdown_workers(workers, job):

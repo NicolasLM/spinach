@@ -1,13 +1,11 @@
 from django.conf import settings
 
 from spinach import RedisBroker
-from spinach.const import DEFAULT_WORKER_NUMBER, DEFAULT_NAMESPACE
+from spinach.const import DEFAULT_NAMESPACE
 
 
 SPINACH_BROKER = getattr(settings, 'SPINACH_BROKER', RedisBroker())
 SPINACH_NAMESPACE = getattr(settings, 'SPINACH_NAMESPACE', DEFAULT_NAMESPACE)
-SPINACH_WORKER_NUMBER = getattr(settings, 'SPINACH_WORKER_NUMBER',
-                                DEFAULT_WORKER_NUMBER)
 SPINACH_ACTUAL_EMAIL_BACKEND = getattr(
     settings,
     'SPINACH_ACTUAL_EMAIL_BACKEND',

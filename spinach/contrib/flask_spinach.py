@@ -15,7 +15,6 @@ class Spinach:
     def init_app(self, app):
         app.config.setdefault('SPINACH_BROKER', spinach.RedisBroker())
         app.config.setdefault('SPINACH_NAMESPACE', app.name)
-        app.config.setdefault('SPINACH_WORKER_NUMBER', DEFAULT_WORKER_NUMBER)
 
         app.extensions['spinach'] = spinach.Engine(
             broker=app.config['SPINACH_BROKER'],
@@ -23,10 +22,14 @@ class Spinach:
         )
         namespace = app.extensions['spinach'].namespace
 
-        @app.cli.command(name='spinach')
-        @click.option('--stop-when-queue-empty', is_flag=True, default=False)
-        @click.argument('queue', default=DEFAULT_QUEUE)
-        def spinach_run_workers(queue, stop_when_queue_empty):
+        @app.cli.command(name='spinach', help='Run Spinach workers')
+        @click.option('--stop-when-queue-empty', is_flag=True, default=False,
+                      help='Stop workers once the queue is empty')
+        @click.option('--queue', default=DEFAULT_QUEUE,
+                      help='Queue to consume')
+        @click.option('--threads', default=DEFAULT_WORKER_NUMBER,
+                      help='Number of worker threads to launch')
+        def spinach_run_workers(threads, queue, stop_when_queue_empty):
 
             # If the application uses the Flask/Raven extension, use its
             # raven client for the integration Spinach/Raven
@@ -35,7 +38,7 @@ class Spinach:
                 register_sentry(app.extensions['sentry'].client)
 
             self.spin.start_workers(
-                number=app.config['SPINACH_WORKER_NUMBER'],
+                number=threads,
                 queue=queue,
                 stop_when_queue_empty=stop_when_queue_empty
             )

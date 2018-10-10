@@ -33,23 +33,12 @@ The Flask integration follows the spirit of Flask very closely, it provides two
 ways of getting started: a single module approach for minial applications and
 an application factory approach for more scalable code.
 
-In both cases the Spinach workers can be run with the Flask CLI::
-
-    $ FLASK_APP=examples.flaskapp flask spinach
-
 The Spinach extension for Flask pushes an application context for the duration
 of the tasks, which means that it plays well with other extensions like
 Flask-SQLAlchemy and doesn't require extra precautions.
 
 Users of the Flask-Sentry extension get their errors sent to Sentry
 automatically in task workers.
-
-Configuration
-~~~~~~~~~~~~~
-
-- ``SPINACH_BROKER``, default ``spinach.RedisBroker()``
-- ``SPINACH_NAMESPACE``, default ``app.name``
-- ``SPINACH_WORKER_NUMBER``, default 5 threads
 
 Single Module
 ~~~~~~~~~~~~~
@@ -104,6 +93,23 @@ imaginary ``auth`` Blueprint containing routes and tasks.
     def send_welcome_email():
         print('Sending email...')
 
+Running workers
+~~~~~~~~~~~~~~~
+
+Workers can be launched from the Flask CLI::
+
+    $ FLASK_APP=examples.flaskapp flask spinach
+
+The working queue and the number of threads can be changed with::
+
+    $ FLASK_APP=examples.flaskapp flask spinach --queue high-priority --threads 20
+
+Configuration
+~~~~~~~~~~~~~
+
+- ``SPINACH_BROKER``, default ``spinach.RedisBroker()``
+- ``SPINACH_NAMESPACE``, defaults to the Flask app name
+
 Django
 ------
 
@@ -141,12 +147,19 @@ Tasks can be easily scheduled from views::
         question = get_object_or_404(Question, pk=question_id)
         tasks.schedule('polls:close_poll', question.id)
 
+Users of the Django Sentry app get their errors sent to Sentry
+automatically in task workers.
+
+Running workers
+~~~~~~~~~~~~~~~
+
 Workers can be launched from ``manage.py``::
 
     $ python manage.py spinach
 
-Users of the Django Sentry app get their errors sent to Sentry
-automatically in task workers.
+The working queue and the number of threads can be changed with::
+
+    $ python manage.py spinach --queue high-priority --threads 20
 
 Sending emails in the background
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -183,7 +196,6 @@ Configuration
 
 - ``SPINACH_BROKER``, default ``spinach.RedisBroker()``
 - ``SPINACH_NAMESPACE``, default ``spinach``
-- ``SPINACH_WORKER_NUMBER``, default 5 threads
 - ``SPINACH_ACTUAL_EMAIL_BACKEND``, default
   ``django.core.mail.backends.smtp.EmailBackend``
 - ``SPINACH_CLEAR_SESSIONS_PERIODICITY``, default ``None`` (disabled)

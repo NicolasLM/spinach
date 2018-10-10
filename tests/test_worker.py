@@ -136,10 +136,10 @@ def test_worker_signals(job):
     mock_job_started_receiver.assert_called_once_with(ns, job=ANY)
     mock_job_finished_receiver.assert_called_once_with(ns, job=ANY)
     mock_worker_started_receiver.assert_called_once_with(
-        ns, worker_name='tests-worker-0'
+        ns, worker_name='tests-worker-1'
     )
     mock_worker_terminated_receiver.assert_called_once_with(
-        ns, worker_name='tests-worker-0'
+        ns, worker_name='tests-worker-1'
     )
 
 

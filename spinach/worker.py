@@ -44,7 +44,7 @@ class Workers:
         self._must_stop = threading.Event()
         self.poison_pill = object()
 
-        for i in range(num_workers):
+        for i in range(1, num_workers + 1):
             thread = threading.Thread(
                 target=self._worker_func,
                 name='{}-worker-{}'.format(self._namespace, i)

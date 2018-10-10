@@ -1,5 +1,3 @@
-import signal
-
 from django.core.management.base import BaseCommand
 try:
     from raven.contrib.django.models import client as raven_client
@@ -34,11 +32,6 @@ class Command(BaseCommand):
 
         if raven_client is not None:
             register_sentry(raven_client, spin.namespace)
-
-        def handle_sigterm(*args):
-            raise KeyboardInterrupt()
-
-        signal.signal(signal.SIGTERM, handle_sigterm)
 
         spin.start_workers(
             number=SPINACH_WORKER_NUMBER,

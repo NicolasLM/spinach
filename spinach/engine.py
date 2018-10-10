@@ -4,7 +4,9 @@ import threading
 from typing import Optional
 
 from .task import Tasks, Batch, RetryException
-from .utils import human_duration, run_forever, exponential_backoff
+from .utils import (
+    human_duration, run_forever, exponential_backoff, handle_sigterm
+)
 from .job import Job, JobStatus
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE, DEFAULT_WORKER_NUMBER
@@ -192,14 +194,15 @@ class Engine:
         self._arbiter.start()
 
         if block:
-            try:
-                self._arbiter.join()
-            except KeyboardInterrupt:
-                self.stop_workers()
-            except AttributeError:
-                # Arbiter thread starts and stops immediately when ran with
-                # `stop_when_queue_empty` and queue is already empty.
-                pass
+            with handle_sigterm():
+                try:
+                    self._arbiter.join()
+                except KeyboardInterrupt:
+                    self.stop_workers()
+                except AttributeError:
+                    # Arbiter thread starts and stops immediately when ran with
+                    # `stop_when_queue_empty` and queue is already empty.
+                    pass
 
     def stop_workers(self, _join_arbiter=True):
         """Stop the workers and wait for them to terminate."""

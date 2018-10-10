@@ -1,6 +1,8 @@
+import contextlib
 from datetime import timedelta
 from logging import Logger
 import random
+import signal
 from threading import Event
 import time
 from typing import Callable
@@ -58,3 +60,24 @@ def exponential_backoff(attempt: int, cap: int=1200) -> timedelta:
 
     temp = min(base * 2 ** attempt, cap)
     return timedelta(seconds=temp / 2 + random.randint(0, temp / 2))
+
+
+@contextlib.contextmanager
+def handle_sigterm():
+    """Handle SIGTERM like a normal SIGINT (KeyboardInterrupt).
+
+    By default Docker sends a SIGTERM for stopping containers, giving them
+    time to terminate before getting killed. If a process does not catch this
+    signal and does nothing, it just gets killed.
+
+    Handling SIGTERM like SIGINT allows to gracefully terminate both
+    interactively with ^C and with `docker stop`.
+
+    This context manager restores the default SIGTERM behavior when exiting.
+    """
+    original_sigterm_handler = signal.getsignal(signal.SIGTERM)
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, original_sigterm_handler)

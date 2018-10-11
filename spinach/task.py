@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 import functools
 import json
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Union
 from numbers import Number
 
 from . import const, exc
@@ -29,6 +29,10 @@ class Task:
             'periodicity': periodicity
         }, sort_keys=True)
 
+    @property
+    def task_name(self):
+        return self.name
+
     def __repr__(self):
         return 'Task({}, {}, {}, {}, {})'.format(
             self.func, self.name, self.queue, self.max_retries,
@@ -43,6 +47,9 @@ class Task:
             except AttributeError:
                 return False
         return True
+
+
+Schedulable = Union[str, Callable, Task]
 
 
 class Tasks:
@@ -76,8 +83,12 @@ class Tasks:
     def tasks(self) -> dict:
         return self._tasks
 
-    def get(self, name: str):
-        task = self._tasks.get(name)
+    def get(self, name: Schedulable) -> Task:
+        try:
+            task_name = name.task_name
+        except AttributeError:
+            task_name = name
+        task = self._tasks.get(task_name)
         if task is not None:
             return task
 
@@ -109,6 +120,10 @@ class Tasks:
 
         self.add(func, name=name, queue=queue, max_retries=max_retries,
                  periodicity=periodicity)
+
+        # Add an attribute to the function to be able to conveniently use it as
+        # spin.schedule(function) instead of spin.schedule('task_name')
+        func.task_name = name
 
         return func
 
@@ -161,10 +176,10 @@ class Tasks:
                 'a Spinach Engine.'
             )
 
-    def schedule(self, task_name: str, *args, **kwargs):
+    def schedule(self, task: Schedulable, *args, **kwargs):
         """Schedule a job to be executed as soon as possible.
 
-        :arg task_name: name of the task to execute in the background
+        :arg task: the task or its name to execute in the background
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
 
@@ -172,12 +187,12 @@ class Tasks:
         Spinach :class:`Engine`.
         """
         self._require_attached_tasks()
-        self._spin.schedule(task_name, *args, **kwargs)
+        self._spin.schedule(task, *args, **kwargs)
 
-    def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
+    def schedule_at(self, task: Schedulable, at: datetime, *args, **kwargs):
         """Schedule a job to be executed in the future.
 
-        :arg task_name: name of the task to execute in the background
+        :arg task: the task or its name to execute in the background
         :arg at: Date at which the job should start. It is advised to pass a
                  timezone aware datetime to lift any ambiguity. However if a
                  timezone naive datetime if given, it will be assumed to
@@ -189,7 +204,7 @@ class Tasks:
         Spinach :class:`Engine`.
         """
         self._require_attached_tasks()
-        self._spin.schedule_at(task_name, at, *args, **kwargs)
+        self._spin.schedule_at(task, at, *args, **kwargs)
 
     def schedule_batch(self, batch: 'Batch'):
         """Schedule many jobs at once.
@@ -225,20 +240,20 @@ class Batch:
     def __init__(self):
         self.jobs_to_create = list()
 
-    def schedule(self, task_name: str, *args, **kwargs):
+    def schedule(self, task: Schedulable, *args, **kwargs):
         """Add a job to be executed ASAP to the batch.
 
-        :arg task_name: name of the task to execute in the background
+        :arg task: the task or its name to execute in the background
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
         """
         at = datetime.now(timezone.utc)
-        self.schedule_at(task_name, at, *args, **kwargs)
+        self.schedule_at(task, at, *args, **kwargs)
 
-    def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
+    def schedule_at(self, task: Schedulable, at: datetime, *args, **kwargs):
         """Add a job to be executed in the future to the batch.
 
-        :arg task_name: name of the task to execute in the background
+        :arg task: the task or its name to execute in the background
         :arg at: Date at which the job should start. It is advised to pass a
                  timezone aware datetime to lift any ambiguity. However if a
                  timezone naive datetime if given, it will be assumed to
@@ -246,7 +261,7 @@ class Batch:
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
         """
-        self.jobs_to_create.append((task_name, at, args, kwargs))
+        self.jobs_to_create.append((task, at, args, kwargs))
 
 
 class RetryException(Exception):

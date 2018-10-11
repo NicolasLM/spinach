@@ -23,6 +23,24 @@ Quickstart
 
 .. literalinclude:: ../examples/quickstart.py
 
+The :class:`Engine` is the central part of Spinach, it allows to define tasks,
+schedule jobs to execute in the background and start background workers.
+:ref:`More details <engine>`.
+
+The Broker is the backend that background workers use to retrieve jobs to
+execute. Spinach provides two brokers: MemoryBroker for development and
+RedisBroker for production.
+
+The :meth:`Engine.task` decorator is used to register tasks. It requires at
+least a `name` to identify the task, but other options can be given to
+customize how the task behaves. :ref:`More details <tasks>`.
+
+Background jobs can then be scheduled by using either the task name or the task
+function::
+
+    spin.schedule('compute', 5, 3)  # identify a task by its name
+    spin.schedule(compute, 5, 3)    # identify a task by its function
+
 Getting started with spinach:
 
 .. toctree::

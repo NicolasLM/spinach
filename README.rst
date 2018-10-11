@@ -44,7 +44,7 @@ Create task and schedule two jobs, one executed now and one later:
 
 
     # Schedule a job to be executed ASAP
-    spin.schedule('compute', 5, 3)
+    spin.schedule(compute, 5, 3)
 
     print('Starting workers, ^C to quit')
     spin.start_workers()

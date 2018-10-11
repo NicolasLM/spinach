@@ -6,7 +6,7 @@ import zlib
 from django.core.mail import EmailMessage
 from django.core.mail.backends.base import BaseEmailBackend
 
-from .tasks import tasks
+from .tasks import tasks, send_emails
 
 
 class BackgroundEmailBackend(BaseEmailBackend):
@@ -17,7 +17,7 @@ class BackgroundEmailBackend(BaseEmailBackend):
             message.message()  # .message() triggers header validation
             msg_count += 1
         messages = serialize_email_messages(messages)
-        tasks.schedule('spinachd:send_emails', messages)
+        tasks.schedule(send_emails, messages)
 
         return msg_count
 

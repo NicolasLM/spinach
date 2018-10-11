@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from logging import getLogger
 import threading
 
-from .task import Tasks, Batch
+from .task import Tasks, Batch, Schedulable
 from .utils import run_forever, handle_sigterm
 from .job import Job, JobStatus, advance_job_status
 from .brokers.base import Broker
@@ -58,23 +58,23 @@ class Engine:
         self._tasks.update(tasks)
         tasks._spin = self
 
-    def execute(self, task_name: str, *args, **kwargs):
-        return self._tasks.get(task_name).func(*args, **kwargs)
+    def execute(self, task: Schedulable, *args, **kwargs):
+        return self._tasks.get(task).func(*args, **kwargs)
 
-    def schedule(self, task_name: str, *args, **kwargs):
+    def schedule(self, task: Schedulable, *args, **kwargs):
         """Schedule a job to be executed as soon as possible.
 
-        :arg task_name: name of the task to execute
+        :arg task: the task or its name to execute in the background
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
         """
         at = datetime.now(timezone.utc)
-        return self.schedule_at(task_name, at, *args, **kwargs)
+        return self.schedule_at(task, at, *args, **kwargs)
 
-    def schedule_at(self, task_name: str, at: datetime, *args, **kwargs):
+    def schedule_at(self, task: Schedulable, at: datetime, *args, **kwargs):
         """Schedule a job to be executed in the future.
 
-        :arg task_name: name of the task to execute
+        :arg task: the task or its name to execute in the background
         :arg at: date at which the job should start. It is advised to pass a
                  timezone aware datetime to lift any ambiguity. However if a
                  timezone naive datetime if given, it will be assumed to
@@ -82,7 +82,7 @@ class Engine:
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
         """
-        task = self._tasks.get(task_name)
+        task = self._tasks.get(task)
         job = Job(task.name, task.queue, at, task.max_retries, task_args=args,
                   task_kwargs=kwargs)
         return self._broker.enqueue_jobs([job])
@@ -96,8 +96,8 @@ class Engine:
         :arg batch: :class:`Batch` instance containing jobs to schedule
         """
         jobs = list()
-        for task_name, at, args, kwargs in batch.jobs_to_create:
-            task = self._tasks.get(task_name)
+        for task, at, args, kwargs in batch.jobs_to_create:
+            task = self._tasks.get(task)
             jobs.append(
                 Job(task.name, task.queue, at, task.max_retries,
                     task_args=args, task_kwargs=kwargs)

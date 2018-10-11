@@ -104,11 +104,13 @@ def test_tasks_decorator():
         pass
 
     assert 'foo' in str(tasks.tasks['foo'].func)
+    assert foo.task_name == 'foo'
     assert tasks.tasks['foo'].name == 'foo'
     assert tasks.tasks['foo'].queue == 'tasks_queue'
     assert tasks.tasks['foo'].max_retries == const.DEFAULT_MAX_RETRIES
 
     assert 'bar' in str(tasks.tasks['bar'].func)
+    assert bar.task_name == 'bar'
     assert tasks.tasks['bar'].name == 'bar'
     assert tasks.tasks['bar'].queue == 'task_queue'
     assert tasks.tasks['bar'].max_retries == 20
@@ -145,16 +147,51 @@ def test_tasks_names():
     assert sorted(tasks.names) == ['bar', 'foo']
 
 
-def test_tasks_get():
+def test_tasks_get_by_name():
     tasks = Tasks()
-    with pytest.raises(exc.UnknownTask):
-        tasks.get('foo')
-
     tasks.add(print, 'foo')
+
     r = tasks.get('foo')
     assert isinstance(r, Task)
     assert r.name == 'foo'
     assert r.func == print
+
+
+def test_tasks_get_by_function():
+    tasks = Tasks()
+
+    @tasks.task(name='foo')
+    def foo():
+        pass
+
+    r = tasks.get(foo)
+    assert isinstance(r, Task)
+    assert r.name == 'foo'
+    assert r.func == foo
+
+
+def test_tasks_get_by_task_object(task):
+    tasks = Tasks()
+    tasks._tasks[task.name] = task
+
+    r = tasks.get(task)
+    assert isinstance(r, Task)
+    assert r.name == task.name
+    assert r.func == task.func
+
+
+def test_tasks_get_by_unknown_or_wrong_object():
+    tasks = Tasks()
+    with pytest.raises(exc.UnknownTask):
+        tasks.get('foo')
+    with pytest.raises(exc.UnknownTask):
+        tasks.get(None)
+    with pytest.raises(exc.UnknownTask):
+        tasks.get(object())
+    with pytest.raises(exc.UnknownTask):
+        tasks.get(b'foo')
+    with pytest.raises(exc.UnknownTask):
+        tasks.get(RuntimeError)
 
 
 def test_tasks_scheduling(task):

@@ -46,6 +46,23 @@ def run_forever(func: Callable, must_stop: Event, logger: Logger,
             must_stop.wait(delay.total_seconds())
 
 
+def call_with_retry(func: Callable, exceptions, max_retries: int,
+                    logger: Logger, *args, **kwargs):
+    """Call a function and retry it on failure."""
+    attempt = 0
+    while True:
+        try:
+            return func(*args, **kwargs)
+        except exceptions as e:
+            attempt += 1
+            if attempt >= max_retries:
+                raise
+
+            delay = exponential_backoff(attempt, cap=60)
+            logger.warning('%s: retrying in %s', e, delay)
+            time.sleep(delay.total_seconds())
+
+
 def exponential_backoff(attempt: int, cap: int=1200) -> timedelta:
     """Calculate a delay to retry using an exponential backoff algorithm.
 
@@ -57,7 +74,6 @@ def exponential_backoff(attempt: int, cap: int=1200) -> timedelta:
     :arg cap: maximum delay, defaults to 20 minutes
     """
     base = 3
-
     temp = min(base * 2 ** attempt, cap)
     return timedelta(seconds=temp / 2 + random.randint(0, temp / 2))
 

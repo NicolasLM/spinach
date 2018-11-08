@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import pytest
 
@@ -93,3 +94,15 @@ def test_old_periodic_tasks(broker):
         b'bar': b'{"max_retries": 0, "name": "bar", '
                 b'"periodicity": 10, "queue": "q1"}'
     }
+
+
+@patch('spinach.brokers.redis.generate_idempotency_token', return_value='42')
+def test_idempotency_token(_, broker):
+    job_1 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 0)
+    job_2 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 0)
+    broker.enqueue_jobs([job_1])
+    broker.enqueue_jobs([job_2])
+
+    jobs = broker.get_jobs_from_queue('foo_queue', max_jobs=10)
+    job_1.status = JobStatus.RUNNING
+    assert jobs == [job_1]

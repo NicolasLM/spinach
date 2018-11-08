@@ -8,7 +8,7 @@ import threading
 from typing import Optional, Iterable, List, Tuple
 import uuid
 
-from redis import StrictRedis
+from redis import StrictRedis, ConnectionError, TimeoutError
 from redis.client import Script
 
 from ..brokers.base import Broker
@@ -16,9 +16,10 @@ from ..job import Job, JobStatus
 from ..task import Task
 from ..const import (
     FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY,
-    PERIODIC_TASKS_HASH_KEY, PERIODIC_TASKS_QUEUE_KEY
+    PERIODIC_TASKS_HASH_KEY, PERIODIC_TASKS_QUEUE_KEY,
+    DEFAULT_ENQUEUE_JOB_RETRIES
 )
-from ..utils import run_forever
+from ..utils import run_forever, call_with_retry
 
 
 logger = getLogger('spinach.broker')
@@ -33,11 +34,14 @@ here = path.abspath(path.dirname(__file__))
 
 class RedisBroker(Broker):
 
-    def __init__(self, redis: Optional[StrictRedis]=None):
+    def __init__(self, redis: Optional[StrictRedis]=None,
+                 enqueue_job_max_retries: int=DEFAULT_ENQUEUE_JOB_RETRIES):
         super().__init__()
         self._r = redis if redis else StrictRedis(**recommended_socket_opts)
+        self.enqueue_job_max_retries = enqueue_job_max_retries
 
         # Register the lua scripts
+        self._idempotency_protected_scripts = list()
         self._move_future_jobs = self._load_script('move_future_jobs.lua')
         self._enqueue_job = self._load_script('enqueue_job.lua')
         self._enqueue_future_job = self._load_script('enqueue_future_job.lua')
@@ -57,13 +61,42 @@ class RedisBroker(Broker):
         self._number_periodic_tasks = 0
 
     def _load_script(self, filename: str) -> Script:
+        """Load a Lua script.
+
+        Read the Lua script file to generate its Script object. If the script
+        starts with a magic string, add it to the list of scripts requiring an
+        idempotency token to execute.
+        """
         with open(path.join(here, 'redis_scripts', filename), mode='rb') as f:
             script_data = f.read()
-        return self._r.register_script(script_data)
+        rv = self._r.register_script(script_data)
+        if script_data.startswith(b'-- idempotency protected script'):
+            self._idempotency_protected_scripts.append(rv)
+        return rv
 
     def _run_script(self, script: Script, *args):
         args = [str(self._id)] + list(args)
-        return script(args=args)
+
+        if script not in self._idempotency_protected_scripts:
+            return script(args=args)
+
+        # Script is protected by idempotency token, can be retried safely
+        idempotency_token = generate_idempotency_token()
+        args.insert(
+            0, self._to_namespaced('idempotency_{}'.format(idempotency_token))
+        )
+        rv = call_with_retry(
+            script,
+            (ConnectionError, TimeoutError),
+            self.enqueue_job_max_retries,
+            logger,
+            args=args
+        )
+        if rv == -1:
+            logger.info('Script not reprocessed because it was '
+                        'already processed once')
+
+        return rv
 
     def enqueue_jobs(self, jobs: Iterable[Job]):
         """Enqueue a batch of jobs."""
@@ -218,6 +251,10 @@ class RedisBroker(Broker):
             return 0
 
         return next_event_time - now
+
+
+def generate_idempotency_token():
+    return str(uuid.uuid4())
 
 
 recommended_socket_opts = {

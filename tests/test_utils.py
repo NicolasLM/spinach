@@ -45,6 +45,25 @@ def test_run_forever(_, mock_monotonic):
     assert must_stop.is_set()
 
 
+@patch('spinach.utils.time.sleep')
+@patch('spinach.utils.exponential_backoff', return_value=timedelta())
+def test_call_with_retry(_, mock_sleep):
+    logger = Mock()
+    call_count = 0
+
+    def func():
+        nonlocal call_count
+        call_count += 1
+
+        if call_count in (1, 2):
+            raise ValueError('Foo')
+        elif call_count == 3:
+            raise RuntimeError('Foo')
+
+    with pytest.raises(RuntimeError):
+        utils.call_with_retry(func, (RuntimeError, ValueError), 3, logger)
+
+
 def test_exponential_backoff():
     with pytest.raises(ValueError):
         utils.exponential_backoff(0)

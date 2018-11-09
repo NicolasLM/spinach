@@ -61,7 +61,6 @@ setup(
         'spinach.brokers.redis_scripts': [
             'move_future_jobs.lua',
             'enqueue_job.lua',
-            'enqueue_future_job.lua',
             'flush.lua',
             'get_jobs_from_queue.lua',
             'register_periodic_tasks.lua'

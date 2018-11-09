@@ -44,7 +44,6 @@ class RedisBroker(Broker):
         self._idempotency_protected_scripts = list()
         self._move_future_jobs = self._load_script('move_future_jobs.lua')
         self._enqueue_job = self._load_script('enqueue_job.lua')
-        self._enqueue_future_job = self._load_script('enqueue_future_job.lua')
         self._flush = self._load_script('flush.lua')
         self._get_jobs_from_queue = self._load_script(
             'get_jobs_from_queue.lua'
@@ -101,14 +100,12 @@ class RedisBroker(Broker):
     def enqueue_jobs(self, jobs: Iterable[Job]):
         """Enqueue a batch of jobs."""
         jobs_to_queue = list()
-        future_jobs = list()
         for job in jobs:
             if job.should_start:
                 job.status = JobStatus.QUEUED
-                jobs_to_queue.append(job.serialize())
             else:
                 job.status = JobStatus.WAITING
-                future_jobs.append(job.serialize())
+            jobs_to_queue.append(job.serialize())
 
         if jobs_to_queue:
             self._run_script(
@@ -116,16 +113,8 @@ class RedisBroker(Broker):
                 self._to_namespaced(NOTIFICATIONS_KEY),
                 self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
                 self.namespace,
-                *jobs_to_queue
-            )
-
-        if future_jobs:
-            self._run_script(
-                self._enqueue_future_job,
-                self._to_namespaced(NOTIFICATIONS_KEY),
-                self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
                 self._to_namespaced(FUTURE_JOBS_KEY),
-                *future_jobs
+                *jobs_to_queue
             )
 
     def move_future_jobs(self) -> int:

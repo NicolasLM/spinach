@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.core.management.base import BaseCommand
 try:
     from raven.contrib.django.models import client as raven_client
@@ -39,6 +40,10 @@ class Command(BaseCommand):
 
         if raven_client is not None:
             register_sentry(raven_client, spin.namespace)
+
+        if apps.is_installed('ddtrace.contrib.django'):
+            from spinach.contrib.datadog import register_datadog
+            register_datadog(namespace=spin.namespace)
 
         spin.start_workers(
             number=options['threads'],

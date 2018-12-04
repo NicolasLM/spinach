@@ -150,6 +150,9 @@ Tasks can be easily scheduled from views::
 Users of the Django Sentry app get their errors sent to Sentry
 automatically in task workers.
 
+Users of the Django Datadog app get their jobs reported to Datadog APM
+automatically in task workers.
+
 Running workers
 ~~~~~~~~~~~~~~~
 
@@ -224,3 +227,29 @@ The integration just needs to be registered before starting workers::
     spin.start_workers()
 
 .. autofunction:: spinach.contrib.sentry.register_sentry
+
+Datadog
+-------
+
+With the Datadog integration, all jobs are automatically reported to
+Datadog APM.
+
+The integration requires `ddtrace <https://pypi.python.org/pypi/ddtrace>`_, the
+Datadog APM client for Python::
+
+    pip install ddtrace
+
+The integration just needs to be registered before starting workers::
+
+    from spinach.contrib.datadog import register_datadog
+
+    register_datadog()
+
+    spin = Engine(MemoryBroker())
+    spin.start_workers()
+
+This only installs the integration with Spinach, other libraries still need to
+be patched by ddtrace. It is recommended to run your application patched as
+explained in the ddtrace documentation.
+
+.. autofunction:: spinach.contrib.datadog.register_datadog

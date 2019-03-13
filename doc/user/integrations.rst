@@ -104,6 +104,13 @@ The working queue and the number of threads can be changed with::
 
     $ FLASK_APP=examples.flaskapp flask spinach --queue high-priority --threads 20
 
+.. note::
+    When in development mode, Flask uses its reloader to automatically restart
+    the process when the code changes. When having periodic tasks defined,
+    using the MemoryBroker and Flask reloader users may see their periodic
+    tasks scheduled each time the code changes. If this is a problem, users
+    are encouraged to switch to the RedisBroker for development.
+
 Configuration
 ~~~~~~~~~~~~~
 

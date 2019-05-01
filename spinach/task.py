@@ -280,3 +280,11 @@ class RetryException(Exception):
     def __init__(self, message, at: Optional[datetime]=None):
         super().__init__(message)
         self.at = at
+
+
+class AbortException(Exception):
+    """Exception raised in a task to indicate that the job should NOT be
+    retried.
+
+    If this exception is raised, all retry attempts are stopped immediately.
+    """

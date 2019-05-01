@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from spinach import RetryException
+from spinach import RetryException, AbortException
 from spinach.job import Job, JobStatus, advance_job_status
 
 from .conftest import get_now, set_now
@@ -115,4 +115,10 @@ def test_advance_job_status(job):
     job.max_retries = 0
     advance_job_status('namespace', job, 1.0,
                        RetryException('Must retry', at=now))
+    assert job.status is JobStatus.FAILED
+
+    job.status = JobStatus.RUNNING
+    job.max_retries = 10
+    advance_job_status('namespace', job, 1.0, AbortException('kaboom'))
+    assert job.max_retries == 0
     assert job.status is JobStatus.FAILED

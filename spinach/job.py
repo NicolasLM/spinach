@@ -7,7 +7,7 @@ from typing import Optional
 import uuid
 
 from . import signals
-from .task import RetryException
+from .task import RetryException, AbortException
 from .utils import human_duration, exponential_backoff
 
 logger = getLogger(__name__)
@@ -162,6 +162,13 @@ def advance_job_status(namespace: str, job: Job, duration: float,
         logger.info('Finished execution of %s in %s', job, duration)
         return
 
+    if isinstance(err, AbortException):
+        job.max_retries = 0
+        logger.error(
+            'Fatal error during execution of %s after %s, canceling retries',
+            job, duration, exc_info=err
+        )
+
     if job.should_retry:
         job.status = JobStatus.NOT_SET
         job.retries += 1
@@ -190,8 +197,9 @@ def advance_job_status(namespace: str, job: Job, duration: float,
 
     job.status = JobStatus.FAILED
     signals.job_failed.send(namespace, job=job, err=err)
-    logger.error(
-        'Error during execution %d/%d of %s after %s',
-        job.max_retries + 1, job.max_retries + 1, job, duration,
-        exc_info=err
-    )
+    if not isinstance(err, AbortException):
+        logger.error(
+            'Error during execution %d/%d of %s after %s',
+            job.max_retries + 1, job.max_retries + 1, job, duration,
+            exc_info=err
+        )

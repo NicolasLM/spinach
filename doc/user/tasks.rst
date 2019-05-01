@@ -89,6 +89,10 @@ allows to precisely control when it should be retried::
 
 .. autoclass:: spinach.task.RetryException
 
+A task can also raise a :class:`AbortException` for short-circuit behavior::
+
+.. autoclass:: spinach.task.AbortException
+
 Periodic tasks
 --------------
 

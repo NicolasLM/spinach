@@ -133,7 +133,7 @@ class RedisBroker(Broker):
                      num_jobs_moved)
         return num_jobs_moved
 
-    def _get_next_future_job(self)-> Optional[Job]:
+    def _get_next_future_job(self) -> Optional[Job]:
         job = self._r.zrangebyscore(
             self._to_namespaced(FUTURE_JOBS_KEY), '-inf', '+inf',
             start=0, num=1

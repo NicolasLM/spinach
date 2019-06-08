@@ -107,7 +107,7 @@ class MemoryBroker(Broker):
         """
         return [(int(e[0]), e[3][0].name) for e in self._scheduler.queue]
 
-    def _get_next_future_job(self)-> Optional[Job]:
+    def _get_next_future_job(self) -> Optional[Job]:
         with self._lock:
             try:
                 return Job.deserialize(self._future_jobs[0])

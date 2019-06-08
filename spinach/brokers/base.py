@@ -95,7 +95,7 @@ class Broker(ABC):
         """
 
     @abstractmethod
-    def _get_next_future_job(self)-> Optional[Job]:
+    def _get_next_future_job(self) -> Optional[Job]:
         """Get the next future job."""
 
     @property

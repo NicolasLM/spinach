@@ -29,7 +29,7 @@ Install Spinach with pip::
 
    pip install spinach
 
-Create task and schedule two jobs, one executed now and one later:
+Create a task and schedule a job to be executed now:
 
 .. code:: python
 

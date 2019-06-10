@@ -37,9 +37,6 @@ The Spinach extension for Flask pushes an application context for the duration
 of the tasks, which means that it plays well with other extensions like
 Flask-SQLAlchemy and doesn't require extra precautions.
 
-Users of the Flask-Sentry extension get their errors sent to Sentry
-automatically in task workers.
-
 Single Module
 ~~~~~~~~~~~~~
 
@@ -154,9 +151,6 @@ Tasks can be easily scheduled from views::
         question = get_object_or_404(Question, pk=question_id)
         tasks.schedule('polls:close_poll', question.id)
 
-Users of the Django Sentry app get their errors sent to Sentry
-automatically in task workers.
-
 Users of the Django Datadog app get their jobs reported to Datadog APM
 automatically in task workers.
 
@@ -217,12 +211,33 @@ With the Sentry integration, failing jobs can be automatically reported to
 `Sentry <https://sentry.io>`_ with full traceback, log breadcrumbs and job
 information.
 
-The integration requires `Raven <https://pypi.python.org/pypi/raven>`_, the
-Sentry client for Python::
+The Sentry integration requires `Sentry SDK
+<https://pypi.org/project/sentry-sdk/>`_::
+
+    pip install sentry_sdk
+
+It then just needs to be registered before starting workers::
+
+    import sentry_sdk
+
+    from spinach.contrib.sentry_sdk_spinach import SpinachIntegration
+
+    sentry_sdk.init(
+        dsn="https://sentry_dsn/42",
+        integrations=[SpinachIntegration()]
+    )
+
+.. autoclass:: spinach.contrib.sentry_sdk_spinach.SpinachIntegration
+
+.. note::
+    Users of the deprecated Raven client for Sentry can use the old Spinach
+    integration below.
+
+The old integration requires `Raven <https://pypi.python.org/pypi/raven>`_::
 
     pip install raven
 
-The integration just needs to be registered before starting workers::
+It then just needs to be registered before starting workers::
 
     from raven import Client
     from spinach.contrib.sentry import register_sentry
@@ -232,8 +247,6 @@ The integration just needs to be registered before starting workers::
 
     spin = Engine(MemoryBroker())
     spin.start_workers()
-
-.. autofunction:: spinach.contrib.sentry.register_sentry
 
 Datadog
 -------

@@ -5,9 +5,12 @@ from spinach import signals
 
 def register_sentry(raven_client, namespace: Optional[str]=None,
                     send_retries: bool=False):
-    """Register the Sentry integration.
+    """Register the Raven Sentry integration.
 
     Exceptions making jobs fail are sent to Sentry.
+
+    This integration relies on the old Raven client for Python, it is now
+    deprecated in favor of the new Sentry SDK.
 
     :param raven_client: configured Raven client used to sent errors to Sentry
     :param namespace: optionally only register the Sentry integration for a

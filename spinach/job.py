@@ -191,7 +191,7 @@ def advance_job_status(namespace: str, job: Job, duration: float,
                         'after %s, retry in %s', *log_args)
         else:
             logger.warning('Error during execution %d/%d of %s after %s, '
-                           'retry in %s', *log_args)
+                           'retry in %s', *log_args, exc_info=err)
 
         return
 

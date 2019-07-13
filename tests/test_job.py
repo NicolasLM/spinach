@@ -5,6 +5,7 @@ import pytest
 
 from spinach import RetryException, AbortException
 from spinach.job import Job, JobStatus, advance_job_status
+from spinach.exc import InvalidJobSignatureError
 
 from .conftest import get_now, set_now
 
@@ -122,3 +123,18 @@ def test_advance_job_status(job):
     advance_job_status('namespace', job, 1.0, AbortException('kaboom'))
     assert job.max_retries == 0
     assert job.status is JobStatus.FAILED
+
+
+def test_check_signature(job):
+    def compatible_func(a, b, foo=None):
+        pass
+
+    def incompatible_func(a, bar=None):
+        pass
+
+    job.task_func = compatible_func
+    assert job.check_signature() is None
+
+    job.task_func = incompatible_func
+    with pytest.raises(InvalidJobSignatureError):
+        job.check_signature()

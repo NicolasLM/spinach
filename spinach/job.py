@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import enum
+import inspect
 import json
 from logging import getLogger
 import math
@@ -7,6 +8,7 @@ from typing import Optional
 import uuid
 
 from . import signals
+from .exc import InvalidJobSignatureError
 from .task import RetryException, AbortException
 from .utils import human_duration, exponential_backoff
 
@@ -131,6 +133,30 @@ class Job:
         job.status = JobStatus(job_dict['status'])
         job.retries = job_dict['retries']
         return job
+
+    def check_signature(self):
+        """Check if a job has the correct params to be executed.
+
+        This can be used to prevent the scheduling of a job that will fail
+        during execution because its arguments do not match the task function.
+
+        :raises InvalidJobSignatureError: Job arguments do not match the task
+        """
+        if self.task_func is None:
+            raise ValueError(
+                'Cannot verify signature until a task function is assigned'
+            )
+
+        try:
+            sig = inspect.signature(self.task_func)
+            sig.bind(*self.task_args, **self.task_kwargs)
+        except TypeError as e:
+            msg = 'Arguments of job not compatible with task {}: {}'.format(
+                self.task_name, e
+            )
+            raise InvalidJobSignatureError(msg)
+        except ValueError:
+            logger.info('Cannot verify job signature, assuming it is correct')
 
     def __repr__(self):
         return 'Job <{} {} {}>'.format(

@@ -85,6 +85,8 @@ class Engine:
         task = self._tasks.get(task)
         job = Job(task.name, task.queue, at, task.max_retries, task_args=args,
                   task_kwargs=kwargs)
+        job.task_func = task.func
+        job.check_signature()
         return self._broker.enqueue_jobs([job])
 
     def schedule_batch(self, batch: Batch):
@@ -98,10 +100,14 @@ class Engine:
         jobs = list()
         for task, at, args, kwargs in batch.jobs_to_create:
             task = self._tasks.get(task)
-            jobs.append(
-                Job(task.name, task.queue, at, task.max_retries,
-                    task_args=args, task_kwargs=kwargs)
+            job = Job(
+                task.name, task.queue, at, task.max_retries,
+                task_args=args, task_kwargs=kwargs
             )
+            job.task_func = task.func
+            job.check_signature()
+            jobs.append(job)
+
         return self._broker.enqueue_jobs(jobs)
 
     def _arbiter_func(self, stop_when_queue_empty=False):

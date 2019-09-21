@@ -17,6 +17,31 @@ logger = getLogger(__name__)
 class Engine:
     """Spinach Engine coordinating a broker with workers.
 
+    This class does the orchestration of all components, it is the one that
+    starts and terminates the whole machinery.
+
+    The Engine can be run in two modes:
+    - client: synchronously submits jobs.
+    - worker: asynchronously executes jobs.
+
+    Submitting jobs is quite easy, so running the Engine in client mode doesn't
+    require spawning any thread.
+
+    Executing jobs however is a bit more involved, so running the Engine in
+    worker mode ends up spawning a few threads:
+    - a few worker threads: they are only responsible for executing the task
+      function and advancing the job status once it is finished.
+    - a result notifier thread: sends back the result of job executions to the
+      Broker backend, acts basically as a client.
+    - an arbiter thread: fetches jobs from the Broker and gives them to the
+      workers as well as doing some periodic bookkeeping.
+    - a Broker subscriber thread: receives notifications from the backend when
+      something happens, typically a job is enqueued.
+    - the process main thread: starts all the above threads, then does nothing
+      waiting for the signal to terminate the threads it started.
+
+    This means that a Spinach worker process has at least 5 threads.
+
     :arg broker: instance of a :class:`Broker`
     :arg namespace: name of the namespace used by the Engine. When different
          Engines use the same Redis server, they must use different

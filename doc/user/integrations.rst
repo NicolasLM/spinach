@@ -224,10 +224,8 @@ It then just needs to be registered before starting workers::
 
     sentry_sdk.init(
         dsn="https://sentry_dsn/42",
-        integrations=[SpinachIntegration()]
+        integrations=[SpinachIntegration(send_retries=False)]
     )
-
-.. autoclass:: spinach.contrib.sentry_sdk_spinach.SpinachIntegration
 
 .. note::
     Users of the deprecated Raven client for Sentry can use the old Spinach

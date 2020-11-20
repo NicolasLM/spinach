@@ -21,6 +21,7 @@ class Engine:
     starts and terminates the whole machinery.
 
     The Engine can be run in two modes:
+
     - client: synchronously submits jobs.
     - worker: asynchronously executes jobs.
 
@@ -29,6 +30,7 @@ class Engine:
 
     Executing jobs however is a bit more involved, so running the Engine in
     worker mode ends up spawning a few threads:
+
     - a few worker threads: they are only responsible for executing the task
       function and advancing the job status once it is finished.
     - a result notifier thread: sends back the result of job executions to the
@@ -44,8 +46,8 @@ class Engine:
 
     :arg broker: instance of a :class:`Broker`
     :arg namespace: name of the namespace used by the Engine. When different
-         Engines use the same Redis server, they must use different
-         namespaces to isolate themselves.
+     Engines use the same Redis server, they must use different namespaces to
+     isolate themselves.
     """
 
     def __init__(self, broker: Broker, namespace: str=DEFAULT_NAMESPACE):

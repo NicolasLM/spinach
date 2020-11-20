@@ -58,7 +58,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Spinach'
-copyright = '2017, Nicolas Le Manchet'
+copyright = '2017-2020, Nicolas Le Manchet'
 author = 'Nicolas Le Manchet'
 
 # The version info for the project you're documenting, acts as replacement for

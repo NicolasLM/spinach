@@ -6,11 +6,13 @@ FAQ
 Should I use Spinach?
 ---------------------
 
-Spinach is a very young software, if your business depends heavily on
-background tasks you should probably go with Celery or RQ.
+Spinach was designed from the ground up to be reliable. It is built using proven
+technologies (Redis, Python queues, thread pools...), is heavily tested and in
+my experience just works.
 
-That being said, Spinach relies on proven technologies (Redis, Python queues,
-thread pools...) and is heavily tested.
+The project has been around for long enough that I am now confident it is a good
+option among task frameworks. If after reading this documentation you feel like
+giving it a try, go for it!
 
 Threads are not enough, can I use Processes?
 --------------------------------------------

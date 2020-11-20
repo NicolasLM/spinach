@@ -1,8 +1,8 @@
 Spinach
 =======
 
-.. image:: https://travis-ci.org/NicolasLM/spinach.svg?branch=master
-    :target: https://travis-ci.org/NicolasLM/spinach
+.. image:: https://github.com/NicolasLM/spinach/workflows/Run%20tests/badge.svg?branch=master
+    :target: https://github.com/NicolasLM/spinach/actions
 .. image:: https://coveralls.io/repos/github/NicolasLM/spinach/badge.svg?branch=master
     :target: https://coveralls.io/github/NicolasLM/spinach?branch=master
 .. image:: https://readthedocs.org/projects/spinach/badge/?version=latest

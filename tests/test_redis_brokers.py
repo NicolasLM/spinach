@@ -14,6 +14,7 @@ from spinach.task import Task
 def broker():
     broker = RedisBroker()
     broker.namespace = 'tests'
+    broker.must_stop_periodicity = 0.01
     broker.flush()
     broker.start()
     yield broker

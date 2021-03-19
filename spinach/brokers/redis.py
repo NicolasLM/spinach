@@ -34,6 +34,11 @@ here = path.abspath(path.dirname(__file__))
 
 class RedisBroker(Broker):
 
+    #: How often to check if the subscriber thread must stop, in seconds.
+    #: This is a trade off between responsiveness when stopping a worker
+    #: and wasted CPU cycles.
+    must_stop_periodicity = 1
+
     def __init__(self, redis: Optional[StrictRedis]=None,
                  enqueue_job_max_retries: int=DEFAULT_ENQUEUE_JOB_RETRIES):
         super().__init__()
@@ -171,8 +176,18 @@ class RedisBroker(Broker):
         channel_name = self._to_namespaced(NOTIFICATIONS_KEY)
         pub_sub.subscribe(channel_name)
 
+        # The subscriber basically waits for two things that can happen
+        # independently:
+        #   - must stop being set, meaning the thread should terminate
+        #   - a message from the pub sub is received
+        #
+        # Because one of them is a threading.Event and the other one is
+        # receiving something from a socket, it is not obvious how to
+        # wait for those two things at the same time. Hence the approach
+        # taken here which waits only for the pub sub but polls the must
+        # stop event every second. Not very elegant.
         while not self._must_stop.is_set():
-            if not pub_sub.get_message(timeout=1):
+            if not pub_sub.get_message(timeout=self.must_stop_periodicity):
                 continue
 
             # Consume all messages

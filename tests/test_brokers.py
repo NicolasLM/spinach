@@ -15,6 +15,7 @@ from .conftest import get_now, set_now
 def broker(request):
     broker = request.param()
     broker.namespace = 'tests'
+    broker.must_stop_periodicity = 0.01
     broker.flush()
     broker.start()
     yield broker

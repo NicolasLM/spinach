@@ -115,5 +115,18 @@ class Broker(ABC):
     def flush(self):
         """Delete everything in the namespace."""
 
+    @abstractmethod
+    def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
+        """Re-enqueue the jobs that were running on a broker.
+
+        Only jobs that can be retired are moved back to the queue, the others
+        are lost as expected.
+
+        Both current the broker and the dead one must use the same namespace.
+
+        :param dead_broker_id: UUID of the dead broker.
+        :return: Number of jobs that were moved back to the queue.
+        """
+
     def __repr__(self):
         return '<{}: {}>'.format(self.__class__.__name__, self._id)

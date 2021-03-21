@@ -26,7 +26,13 @@ Spinach knows two kinds of tasks: the ones that can be retried safely
 tasks). Since Spinach cannot guess if a task code is safe to be retried
 multiple times, it must be annotated when the task is created.
 
-Non-Retriable Tasks
+.. note::
+
+    Whether a task is retryable or not affects the behavior of jobs in case of
+    normal errors during their execution but also when a worker
+    catastrophically dies (power outage, OOM killed...).
+
+Non-Retryable Tasks
 ~~~~~~~~~~~~~~~~~~~
 
 Spinach assumes that by default tasks are not safe to be retried (tasks are
@@ -38,29 +44,35 @@ These tasks are defined with `max_retries=0` (the default)::
     def foo(a, b):
         pass
 
-- use at-most-once delivery, the job may never even start
-- jobs are not automatically retried in case of errors
+- use at-most-once delivery
+- it is guarantied that the job will not run multiple times
+- it is guarantied that the job will not run simultaneously in multiple workers
+- the job is not automatically retried in case of errors
+- the job may never even start in very rare conditions
 
-Retriable Tasks
+Retryable Tasks
 ~~~~~~~~~~~~~~~
 
 Idempotent tasks can be executed multiple times without changing the result
-beyond the initial application. It is a nice property to have and most tasks
+beyond the initial execution. It is a nice property to have and most tasks
 should try to be idempotent to gracefully recover from errors.
 
-Retriable tasks are defined with a positive `max_retries` value::
+Retryable tasks are defined with a positive `max_retries` value::
 
     @tasks.task(name='foo', max_retries=10)
     def foo(a, b):
         pass
 
-- use at-least-once delivery, the job may be executed more than once
-- jobs are automatically retried, up to `max_retries` times, in case of errors
+- use at-least-once delivery
+- the job is automatically retried, up to `max_retries` times, in case of errors
+- the job may be executed more than once
+- the job may be executed simultaneously in multiple workers in very rare
+  conditions
 
 Retrying
 ~~~~~~~~
 
-When a retriable task is being executed it will be retried when it encounters
+When a retryable task is being executed it will be retried when it encounters
 an unexpected exception::
 
     @tasks.task(name='foo', max_retries=10)

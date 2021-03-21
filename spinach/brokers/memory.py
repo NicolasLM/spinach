@@ -5,6 +5,7 @@ import sched
 import threading
 import time
 from typing import Optional, Iterable, List, Tuple
+import uuid
 
 from .base import Broker
 from ..job import Job, JobStatus
@@ -133,6 +134,10 @@ class MemoryBroker(Broker):
         with self._lock:
             self._queues = dict()
             self._future_jobs = list()
+
+    def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
+        # A memory broker cannot be dead
+        return 0
 
     def remove_job_from_running(self, job: Job):
         """Remove a job from the list of running ones.

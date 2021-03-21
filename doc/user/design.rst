@@ -189,3 +189,6 @@ orchestrator like Kubernetes or Nomad that often scale and shuffle containers
 around. Workers can join and leave the cluster at any time without impacting
 the ability to process jobs.
 
+Because worker processes can die unexpectedly (power loss, OOM killed, extended
+network outage...), Spinach tries to detect dead workers and reschedule
+the jobs that were running on them if the jobs are safe to be retried.

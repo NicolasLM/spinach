@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+import uuid
 
 import pytest
 
@@ -90,6 +91,12 @@ def test_flush(broker):
     broker.flush()
     assert broker.get_jobs_from_queue('q1', 1) == []
     assert broker.next_future_job_delta is None
+
+
+def test_enqueue_jobs_from_dead_broker(broker):
+    # Marking a broker that doesn't exist as dead
+    broker_id = uuid.UUID('62664577-cf89-4f6a-ab16-4e20ec8fe4c2')
+    assert broker.enqueue_jobs_from_dead_broker(broker_id) == 0
 
 
 def test_repr(broker):

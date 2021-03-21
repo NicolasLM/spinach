@@ -22,6 +22,10 @@ def broker():
     broker.flush()
 
 
+# Fixture to get a second broker
+broker_2 = broker
+
+
 def test_redis_flush(broker):
     broker._r.set('tests/foo', b'1')
     broker._r.set('tests2/foo', b'2')
@@ -71,6 +75,28 @@ def test_running_job(broker):
     broker.remove_job_from_running(job)
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     assert broker.get_jobs_from_queue('foo_queue', 1) == []
+
+
+def test_enqueue_jobs_from_dead_broker(broker, broker_2):
+    # Enqueue one idempotent job and one non-idempotent job
+    job_1 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 0)
+    job_2 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 10)
+    broker.enqueue_jobs([job_1, job_2])
+
+    # Simulate broker starting the jobs
+    broker.get_jobs_from_queue('foo_queue', 100)
+
+    # Mark broker as dead, should re-enqueue only the idempotent job
+    assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == 1
+
+    # Simulate broker 2 getting jobs from the queue
+    job_2.status = JobStatus.RUNNING
+    job_2.retries = 1
+    assert broker_2.get_jobs_from_queue('foo_queue', 100) == [job_2]
+
+    # Check that a broker can be marked as dead multiple times
+    # without duplicating jobs
+    assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == 0
 
 
 def test_old_periodic_tasks(broker):

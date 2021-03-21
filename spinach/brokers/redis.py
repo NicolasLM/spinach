@@ -47,12 +47,15 @@ class RedisBroker(Broker):
 
         # Register the lua scripts
         self._idempotency_protected_scripts = list()
-        self._move_future_jobs = self._load_script('move_future_jobs.lua')
         self._enqueue_job = self._load_script('enqueue_job.lua')
+        self._enqueue_jobs_from_dead_broker = self._load_script(
+            'enqueue_jobs_from_dead_broker.lua'
+        )
         self._flush = self._load_script('flush.lua')
         self._get_jobs_from_queue = self._load_script(
             'get_jobs_from_queue.lua'
         )
+        self._move_future_jobs = self._load_script('move_future_jobs.lua')
         self._register_periodic_tasks = self._load_script(
             'register_periodic_tasks.lua'
         )
@@ -79,12 +82,14 @@ class RedisBroker(Broker):
         return rv
 
     def _run_script(self, script: Script, *args):
+        # Always insert broker_id as first argument
         args = [str(self._id)] + list(args)
 
         if script not in self._idempotency_protected_scripts:
             return script(args=args)
 
-        # Script is protected by idempotency token, can be retried safely
+        # Script is protected by idempotency token, can be retried safely.
+        # Insert idempotency token as first argument.
         idempotency_token = generate_idempotency_token()
         args.insert(
             0, self._to_namespaced('idempotency_{}'.format(idempotency_token))
@@ -214,6 +219,14 @@ class RedisBroker(Broker):
 
     def flush(self):
         self._run_script(self._flush, self.namespace)
+
+    def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
+        return self._run_script(
+            self._enqueue_jobs_from_dead_broker,
+            self._to_namespaced(RUNNING_JOBS_KEY.format(dead_broker_id)),
+            self.namespace,
+            self._to_namespaced(NOTIFICATIONS_KEY)
+        )
 
     def register_periodic_tasks(self, tasks: Iterable[Task]):
         """Register tasks that need to be scheduled periodically."""

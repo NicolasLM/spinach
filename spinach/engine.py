@@ -255,7 +255,7 @@ class Engine:
     def _result_notifier_func(self):
         logger.debug('Result notifier started')
 
-        while not self._must_stop.is_set():
+        while True:
             job = self._workers.out_queue.get()
             if job is self._workers.poison_pill:
                 break

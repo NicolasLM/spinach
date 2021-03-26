@@ -1,7 +1,10 @@
 local broker_id = ARGV[1]
-local running_jobs_key = ARGV[2]
-local namespace = ARGV[3]
-local notifications = ARGV[4]
+local dead_broker_id = ARGV[2]
+local running_jobs_key = ARGV[3]
+local all_brokers_hash_key = ARGV[4]
+local all_brokers_zset_key = ARGV[5]
+local namespace = ARGV[6]
+local notifications = ARGV[7]
 
 local num_enqueued_jobs = 0
 
@@ -32,6 +35,10 @@ for _, job_json in ipairs(jobs_json) do
 
     redis.call('hdel', running_jobs_key, job["id"])
 end
+
+-- Remove the broker from the list of brokers
+redis.call('hdel', all_brokers_hash_key, dead_broker_id)
+redis.call('zrem', all_brokers_zset_key, dead_broker_id)
 
 if num_enqueued_jobs > 0 then
     redis.call('publish', notifications, '')

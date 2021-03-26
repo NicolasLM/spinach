@@ -5,7 +5,7 @@ import math
 from os import path
 import socket
 import threading
-from typing import Optional, Iterable, List, Tuple
+from typing import Optional, Iterable, List, Tuple, Dict, Union
 import uuid
 
 from redis import StrictRedis, ConnectionError, TimeoutError
@@ -17,7 +17,7 @@ from ..task import Task
 from ..const import (
     FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY,
     PERIODIC_TASKS_HASH_KEY, PERIODIC_TASKS_QUEUE_KEY,
-    DEFAULT_ENQUEUE_JOB_RETRIES
+    DEFAULT_ENQUEUE_JOB_RETRIES, ALL_BROKERS_HASH_KEY, ALL_BROKERS_ZSET_KEY
 )
 from ..utils import run_forever, call_with_retry
 
@@ -26,18 +26,19 @@ logger = getLogger('spinach.broker')
 here = path.abspath(path.dirname(__file__))
 
 
-# Todo: make move_future_jobs into a more generic task not always executed at
-# arbiter loop (like once per minute) that:
-# - moves future jobs
-# - registers the broker
-# - moves running jobs from stale brokers
-
 class RedisBroker(Broker):
 
     #: How often to check if the subscriber thread must stop, in seconds.
     #: This is a trade off between responsiveness when stopping a worker
     #: and wasted CPU cycles.
     must_stop_periodicity = 1
+
+    #: How long before a broker that did not send a keepalive is
+    #: considered dead and its running jobs are automatically re-enqueued.
+    #: 30 minutes by default may seem long, but it is a trade off between
+    #: reactivity to reschedule jobs and risk of running the same job
+    #: twice in parallel in case of network partition.
+    broker_dead_threshold_seconds = 1800
 
     def __init__(self, redis: Optional[StrictRedis]=None,
                  enqueue_job_max_retries: int=DEFAULT_ENQUEUE_JOB_RETRIES):
@@ -47,6 +48,7 @@ class RedisBroker(Broker):
 
         # Register the lua scripts
         self._idempotency_protected_scripts = list()
+        self._deregister = self._load_script('deregister.lua')
         self._enqueue_job = self._load_script('enqueue_job.lua')
         self._enqueue_jobs_from_dead_broker = self._load_script(
             'enqueue_jobs_from_dead_broker.lua'
@@ -128,7 +130,7 @@ class RedisBroker(Broker):
             )
 
     def move_future_jobs(self) -> int:
-        num_jobs_moved = self._run_script(
+        num_jobs_moved, dead_brokers_id = self._run_script(
             self._move_future_jobs,
             self.namespace,
             self._to_namespaced(FUTURE_JOBS_KEY),
@@ -137,8 +139,37 @@ class RedisBroker(Broker):
             JobStatus.QUEUED.value,
             self._to_namespaced(PERIODIC_TASKS_HASH_KEY),
             self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
+            self._to_namespaced(ALL_BROKERS_HASH_KEY),
+            self._to_namespaced(ALL_BROKERS_ZSET_KEY),
+            json.dumps(self._get_broker_info()),
+            self.broker_dead_threshold_seconds,
             *[str(uuid.uuid4()) for _ in range(self._number_periodic_tasks)]
         )
+
+        # The script may return a list of IDs of dead brokers,
+        # convert it into the actual info of the dead brokers.
+        dead_brokers = list()
+        if dead_brokers_id:
+            dead_brokers = [
+                b for b in self.get_all_brokers()
+                if b['id'].encode() in dead_brokers_id
+            ]
+
+        # Mark the dead brokers as dead and re-enqueue the jobs that were
+        # running on them.
+        for dead_broker in dead_brokers:
+            logger.debug(
+                'Worker %s on %s detected dead, re-enqueuing its jobs',
+                dead_broker['id'], dead_broker['name']
+            )
+            num_jobs_re_enqueued = self.enqueue_jobs_from_dead_broker(
+                uuid.UUID(dead_broker['id'])
+            )
+            logger.warning(
+                'Worker %s on %s marked as dead, %d jobs were re-enqueued',
+                dead_broker['id'], dead_broker['name'], num_jobs_re_enqueued
+            )
+
         logger.debug("Redis moved %s job(s) from future to current queues",
                      num_jobs_moved)
         return num_jobs_moved
@@ -201,6 +232,14 @@ class RedisBroker(Broker):
 
             logger.debug('Got a message from channel %s', channel_name)
             self._something_happened.set()
+
+        logger.debug('Deregistering broker')
+        self._run_script(
+            self._deregister,
+            self._to_namespaced(ALL_BROKERS_HASH_KEY),
+            self._to_namespaced(ALL_BROKERS_ZSET_KEY)
+        )
+
         logger.debug('Redis broker subscriber terminated')
 
     def start(self):
@@ -220,10 +259,19 @@ class RedisBroker(Broker):
     def flush(self):
         self._run_script(self._flush, self.namespace)
 
+    def get_all_brokers(self) -> List[Dict[str, Union[None, str, int]]]:
+        rv = self._r.hvals(
+            self._to_namespaced(ALL_BROKERS_HASH_KEY),
+        )
+        return [json.loads(r.decode()) for r in rv]
+
     def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
         return self._run_script(
             self._enqueue_jobs_from_dead_broker,
+            str(dead_broker_id),
             self._to_namespaced(RUNNING_JOBS_KEY.format(dead_broker_id)),
+            self._to_namespaced(ALL_BROKERS_HASH_KEY),
+            self._to_namespaced(ALL_BROKERS_ZSET_KEY),
             self.namespace,
             self._to_namespaced(NOTIFICATIONS_KEY)
         )

@@ -99,6 +99,23 @@ def test_enqueue_jobs_from_dead_broker(broker):
     assert broker.enqueue_jobs_from_dead_broker(broker_id) == 0
 
 
+def test_get_broker_info(broker):
+    info = broker._get_broker_info()
+    assert 'id' in info
+    assert 'name' in info
+    assert 'started_at' in info
+    assert 'last_seen_at' in info
+    assert info['namespace'] == broker.namespace
+
+
+def test_get_all_brokers(broker):
+    broker.move_future_jobs()  # Manually trigger registration
+    all_brokers = broker.get_all_brokers()
+    assert len(all_brokers) == 1
+    assert isinstance(all_brokers, list)
+    assert isinstance(all_brokers[0], dict)
+
+
 def test_repr(broker):
     assert broker.__class__.__name__ in repr(broker)
     assert str(broker._id) in repr(broker)

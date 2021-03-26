@@ -4,7 +4,7 @@ from queue import Queue, Empty
 import sched
 import threading
 import time
-from typing import Optional, Iterable, List, Tuple
+from typing import Optional, Iterable, List, Tuple, Dict, Union
 import uuid
 
 from .base import Broker
@@ -58,11 +58,17 @@ class MemoryBroker(Broker):
                 queue = self._get_queue(job.queue)
                 queue.put(job.serialize())
                 self._future_jobs.pop(0)
-                self._something_happened.set()
                 num_jobs_moved += 1
 
                 job = self._get_next_future_job()
+
+            if num_jobs_moved < 0:
+                # At least one job got enqueued so the flag must be set
+                self._something_happened.set()
+
+        # Create jobs from due periodic tasks
         self._scheduler.run(blocking=False)
+
         return num_jobs_moved
 
     def register_periodic_tasks(self, tasks: Iterable[Task]):
@@ -134,6 +140,10 @@ class MemoryBroker(Broker):
         with self._lock:
             self._queues = dict()
             self._future_jobs = list()
+
+    def get_all_brokers(self) -> List[Dict[str, Union[None, str, int]]]:
+        # A memory broker is not connected to any other broker
+        return [self._get_broker_info()]
 
     def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
         # A memory broker cannot be dead

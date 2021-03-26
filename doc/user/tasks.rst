@@ -69,6 +69,10 @@ Retryable tasks are defined with a positive `max_retries` value::
 - the job may be executed simultaneously in multiple workers in very rare
   conditions
 
+When a worker catastrophically dies it will be detected dead after 30 minutes
+of inactivity and the retryable jobs that were running will be rescheduled
+automatically.
+
 Retrying
 ~~~~~~~~
 

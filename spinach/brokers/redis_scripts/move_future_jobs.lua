@@ -6,9 +6,21 @@ local now = ARGV[5]
 local job_status_queued = tonumber(ARGV[6])
 local periodic_tasks_hash = ARGV[7]
 local periodic_tasks_queue = ARGV[8]
--- uuids starting at ARGV[9]
+local all_brokers_hash_key = ARGV[9]
+local all_brokers_zset_key = ARGV[10]
+local broker_info_json = ARGV[11]
+local broker_dead_threshold_seconds = ARGV[12]
+-- uuids starting at ARGV[13]
 -- lua in Redis cannot generate random UUIDs, so they are generated in Python
 -- and passed with each calls
+
+-- Register the current broker keepalive
+local broker_info = cjson.decode(broker_info_json)
+redis.call('hset', all_brokers_hash_key, broker_info["id"], broker_info_json)
+redis.call('zadd', all_brokers_zset_key, broker_info["last_seen_at"], broker_info["id"])
+
+-- Get IDs of brokers that were not seen for a long time
+local dead_brokers_id = redis.call('zrangebyscore', all_brokers_zset_key, '-inf', now - broker_dead_threshold_seconds, 'LIMIT', 0, 10)
 
 -- Get the future jobs that are due
 -- Limit to fetching 1000 of them to avoid the script to take too long
@@ -16,7 +28,7 @@ local jobs_json = redis.call('zrangebyscore', future_jobs, '-inf', now, 'LIMIT',
 local jobs_moved = 0
 
 -- Create jobs from due periodic tasks
-local number_of_uuids = #ARGV + 1 - 9  -- as uuids start at ARGV[9]
+local number_of_uuids = #ARGV + 1 - 13  -- as uuids start at ARGV[13]
 local task_names = redis.call('zrangebyscore', periodic_tasks_queue, '-inf', now, 'LIMIT', 0, number_of_uuids)
 for i, task_name in ipairs(task_names) do
 
@@ -28,7 +40,7 @@ for i, task_name in ipairs(task_names) do
     else
         local task = cjson.decode(task_json)
         local job = {}
-        job["id"] = ARGV[9 + i - 1]
+        job["id"] = ARGV[13 + i - 1]
         job["status"] = job_status_queued
         job["task_name"] = task_name
         job["queue"] = task["queue"]
@@ -46,10 +58,6 @@ for i, task_name in ipairs(task_names) do
     end
 end
 
-if not jobs_json then
-    return jobs_moved
-end
-
 for i, job_json in ipairs(jobs_json) do
     local job = cjson.decode(job_json)
     local queue = string.format("%s/%s", namespace, job["queue"])
@@ -64,5 +72,5 @@ if jobs_moved > 0 then
     redis.call('publish', notifications, '')
 end
 
-return jobs_moved
+return {jobs_moved, dead_brokers_id}
 

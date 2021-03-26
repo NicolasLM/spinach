@@ -11,5 +11,7 @@ RUNNING_JOBS_KEY = '_running-jobs-on-broker-{}'
 NOTIFICATIONS_KEY = '_notifications'
 PERIODIC_TASKS_HASH_KEY = '_periodic_tasks_hash'
 PERIODIC_TASKS_QUEUE_KEY = '_periodic_tasks_queue'
+ALL_BROKERS_HASH_KEY = '_all_brokers_hash'
+ALL_BROKERS_ZSET_KEY = '_all_brokers_zset'
 
 WAIT_FOR_EVENT_MAX_SECONDS = 60

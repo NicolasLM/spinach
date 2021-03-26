@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+import time
+from unittest.mock import patch, Mock
 
 import pytest
 
@@ -97,6 +98,42 @@ def test_enqueue_jobs_from_dead_broker(broker, broker_2):
     # Check that a broker can be marked as dead multiple times
     # without duplicating jobs
     assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == 0
+
+
+def test_detect_dead_broker(broker, broker_2):
+    broker_2.enqueue_jobs_from_dead_broker = Mock(return_value=10)
+
+    # Register the first broker
+    broker.move_future_jobs()
+
+    # Set the 2nd broker to detect dead brokers after 2 seconds of inactivity
+    broker_2.broker_dead_threshold_seconds = 2
+    time.sleep(2.1)
+
+    # Detect dead brokers
+    broker_2.move_future_jobs()
+    broker_2.enqueue_jobs_from_dead_broker.assert_called_once_with(
+        broker._id
+    )
+
+
+def test_not_detect_deregistered_broker_as_dead(broker, broker_2):
+    broker_2.enqueue_jobs_from_dead_broker = Mock(return_value=10)
+
+    # Register and de-register the first broker
+    broker.move_future_jobs()
+    broker.stop()
+
+    # Set the 2nd broker to detect dead brokers after 2 seconds of inactivity
+    broker_2.broker_dead_threshold_seconds = 2
+    time.sleep(2.1)
+
+    # Detect dead brokers
+    broker_2.move_future_jobs()
+    broker_2.enqueue_jobs_from_dead_broker.assert_not_called()
+
+    # Just so that the fixture can terminate properly
+    broker.stop = Mock()
 
 
 def test_old_periodic_tasks(broker):

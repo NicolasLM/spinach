@@ -61,6 +61,7 @@ setup(
 
     package_data={
         'spinach.brokers.redis_scripts': [
+            'deregister.lua',
             'enqueue_job.lua',
             'enqueue_jobs_from_dead_broker.lua',
             'flush.lua',

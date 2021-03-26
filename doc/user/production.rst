@@ -49,6 +49,14 @@ recommended.
 Workers should be started by an init system that will restart them if they get
 killed or if the host reboots.
 
+To gracefully shutdown a worker, it is recommended to send it a `SIGINT` or a
+`SIGTERM` and let it finish its running jobs. If the worker gets killed before
+it terminates gracefully, non-retryable jobs will be lost and retryable jobs
+will be rescheduled automatically after the worker is identified as dead, which
+takes 30 minutes by default. This is important if Spinach workers run in docker
+containers because docker gives 10 seconds to a container to finish before
+killing it.
+
 Production Checklist
 --------------------
 

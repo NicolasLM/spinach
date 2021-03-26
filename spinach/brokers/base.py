@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from logging import getLogger
+import platform
 import threading
-from typing import Optional, Iterable, List, Tuple
+import time
+from typing import Optional, Iterable, List, Tuple, Dict, Union
 import uuid
 
 from ..job import Job
@@ -18,6 +20,11 @@ class Broker(ABC):
         self._something_happened = threading.Event()
         self._namespace = None
         self._id = uuid.uuid4()
+        self._broker_info = {
+            'id': str(self._id),
+            'name': platform.node(),
+            'started_at': int(time.time())
+        }
 
     def wait_for_event(self):
         next_future_job_delta = self.next_future_job_delta
@@ -53,13 +60,16 @@ class Broker(ABC):
     def namespace(self) -> str:
         if not self._namespace:
             raise RuntimeError('Namespace must be set before using the broker')
+
         return self._namespace
 
     @namespace.setter
     def namespace(self, value: str):
         if self._namespace:
             raise RuntimeError('The namespace can only be set once')
+
         self._namespace = value
+        self._broker_info['namespace'] = value
 
     def _to_namespaced(self, value: str) -> str:
         return '{}/{}'.format(self.namespace, value)
@@ -89,7 +99,16 @@ class Broker(ABC):
 
     @abstractmethod
     def move_future_jobs(self) -> int:
-        """Move ready jobs from the future queue to their normal queues.
+        """Perform periodic management of the broker and the queues.
+
+        This method originally only moved future jobs, but it expanded to
+        perform other actions related to maintenance of brokers' data:
+        - Moves ready jobs from the future queue to their normal queues
+        - Enqueue periodic tasks that are due
+        - Perform broker keepalive
+
+        Note: This method may be called very often. In the future it would be
+        preferable to decouple it from the retrieval of jobs from the queue.
 
         :returns the number of jobs moved
         """
@@ -116,17 +135,33 @@ class Broker(ABC):
         """Delete everything in the namespace."""
 
     @abstractmethod
+    def get_all_brokers(self) -> List[Dict[str, Union[None, str, int]]]:
+        """Return all registered brokers."""
+
+    @abstractmethod
     def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
         """Re-enqueue the jobs that were running on a broker.
 
         Only jobs that can be retired are moved back to the queue, the others
         are lost as expected.
 
-        Both current the broker and the dead one must use the same namespace.
+        Both the current broker and the dead one must use the same namespace.
+
+        This method is called automatically on brokers that are identified
+        as dead by Spinach but it can also be used by user's code.
+        If someone has a better system to detect dead processes (monitoring,
+        Consul, etcd...) this method can be called with the ID of the dead
+        broker to re-enqueue jobs before Spinach notices that the broker is
+        actually dead, which takes 30 minutes by default.
 
         :param dead_broker_id: UUID of the dead broker.
         :return: Number of jobs that were moved back to the queue.
         """
+
+    def _get_broker_info(self) -> Dict[str, Union[None, str, int]]:
+        rv = self._broker_info.copy()
+        rv['last_seen_at'] = int(time.time())
+        return rv
 
     def __repr__(self):
         return '<{}: {}>'.format(self.__class__.__name__, self._id)

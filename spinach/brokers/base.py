@@ -17,7 +17,14 @@ logger = getLogger('spinach.broker')
 class Broker(ABC):
 
     def __init__(self):
+        # Event that is set whenever:
+        #   - a job is enqueued in the main queue (to allow to fetch it)
+        #   - a job has been finished (to allow to fetch a new one)
+        #   - a future job is put in the waiting queue (to move it)
+        #   - the broker is stopping
+        # It allows the Engine to wait for these things.
         self._something_happened = threading.Event()
+
         self._namespace = None
         self._id = uuid.uuid4()
         self._broker_info = {

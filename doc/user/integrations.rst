@@ -227,24 +227,6 @@ It then just needs to be registered before starting workers::
         integrations=[SpinachIntegration(send_retries=False)]
     )
 
-.. note::
-    Users of the deprecated Raven client for Sentry can use the old Spinach
-    integration below.
-
-The old integration requires `Raven <https://pypi.python.org/pypi/raven>`_::
-
-    pip install raven
-
-It then just needs to be registered before starting workers::
-
-    from raven import Client
-    from spinach.contrib.sentry import register_sentry
-
-    raven_client = Client('https://sentry_dsn/42')
-    register_sentry(raven_client)
-
-    spin = Engine(MemoryBroker())
-    spin.start_workers()
 
 Datadog
 -------

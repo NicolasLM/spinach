@@ -30,13 +30,6 @@ class Spinach:
         @click.option('--threads', default=DEFAULT_WORKER_NUMBER,
                       help='Number of worker threads to launch')
         def spinach_run_workers(threads, queue, stop_when_queue_empty):
-
-            # If the application uses the Flask/Raven extension, use its
-            # raven client for the integration Spinach/Raven
-            if 'sentry' in app.extensions:
-                from spinach.contrib.sentry import register_sentry
-                register_sentry(app.extensions['sentry'].client)
-
             self.spin.start_workers(
                 number=threads,
                 queue=queue,

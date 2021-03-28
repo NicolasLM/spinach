@@ -1,11 +1,6 @@
 from django.core.management.base import BaseCommand
-try:
-    from raven.contrib.django.models import client as raven_client
-except ImportError:
-    raven_client = None
 
 from spinach.const import DEFAULT_QUEUE, DEFAULT_WORKER_NUMBER
-from spinach.contrib.sentry import register_sentry
 from spinach.contrib.datadog import register_datadog_if_module_patched
 
 from ...apps import spin
@@ -37,10 +32,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-
-        if raven_client is not None:
-            register_sentry(raven_client, spin.namespace)
-
         # Use the Datadog integration if Datadog is already used
         # to trace Django.
         register_datadog_if_module_patched(

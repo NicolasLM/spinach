@@ -84,15 +84,13 @@ class RedisBroker(Broker):
         return rv
 
     def _run_script(self, script: Script, *args):
-        # Always insert broker_id as first argument
-        args = [str(self._id)] + list(args)
-
         if script not in self._idempotency_protected_scripts:
             return script(args=args)
 
         # Script is protected by idempotency token, can be retried safely.
         # Insert idempotency token as first argument.
         idempotency_token = generate_idempotency_token()
+        args = list(args)
         args.insert(
             0, self._to_namespaced('idempotency_{}'.format(idempotency_token))
         )
@@ -236,6 +234,7 @@ class RedisBroker(Broker):
         logger.debug('Deregistering broker')
         self._run_script(
             self._deregister,
+            str(self._id),
             self._to_namespaced(ALL_BROKERS_HASH_KEY),
             self._to_namespaced(ALL_BROKERS_ZSET_KEY)
         )

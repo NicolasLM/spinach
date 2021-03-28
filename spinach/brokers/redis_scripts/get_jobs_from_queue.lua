@@ -1,8 +1,7 @@
-local broker_id = ARGV[1]
-local queue = ARGV[2]
-local running_jobs_key = ARGV[3]
-local job_status_running = tonumber(ARGV[4])
-local max_jobs = tonumber(ARGV[5])
+local queue = ARGV[1]
+local running_jobs_key = ARGV[2]
+local job_status_running = tonumber(ARGV[3])
+local max_jobs = tonumber(ARGV[4])
 
 local jobs = {}
 

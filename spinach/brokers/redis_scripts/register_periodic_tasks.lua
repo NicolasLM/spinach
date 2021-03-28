@@ -1,8 +1,7 @@
-local broker_id = ARGV[1]
-local now = ARGV[2]
-local periodic_tasks_hash = ARGV[3]
-local periodic_tasks_queue = ARGV[4]
--- tasks to register starting at ARGV[5]
+local now = ARGV[1]
+local periodic_tasks_hash = ARGV[2]
+local periodic_tasks_queue = ARGV[3]
+-- tasks to register starting at ARGV[4]
 
 
 local function contains(t, e)
@@ -13,7 +12,7 @@ end
 local old_task_names = redis.call('hkeys', periodic_tasks_hash)
 local new_task_names = {}
 
-for i=5, #ARGV do
+for i=4, #ARGV do
     local task_json = ARGV[i]
     local task = cjson.decode(task_json)
     local next_event_time = now + task["periodicity"]

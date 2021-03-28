@@ -1,5 +1,5 @@
-local broker_id = ARGV[1]
-local namespace = ARGV[2]
+local namespace = ARGV[1]
+
 local pattern = string.format("%s/*", namespace)
 
 for _, key in ipairs(redis.call('keys', pattern)) do

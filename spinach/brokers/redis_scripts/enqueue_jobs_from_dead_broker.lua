@@ -1,10 +1,9 @@
-local broker_id = ARGV[1]
-local dead_broker_id = ARGV[2]
-local running_jobs_key = ARGV[3]
-local all_brokers_hash_key = ARGV[4]
-local all_brokers_zset_key = ARGV[5]
-local namespace = ARGV[6]
-local notifications = ARGV[7]
+local dead_broker_id = ARGV[1]
+local running_jobs_key = ARGV[2]
+local all_brokers_hash_key = ARGV[3]
+local all_brokers_zset_key = ARGV[4]
+local namespace = ARGV[5]
+local notifications = ARGV[6]
 
 local num_enqueued_jobs = 0
 

@@ -1,16 +1,15 @@
-local broker_id = ARGV[1]
-local namespace = ARGV[2]
-local future_jobs = ARGV[3]
-local notifications = ARGV[4]
-local now = ARGV[5]
-local job_status_queued = tonumber(ARGV[6])
-local periodic_tasks_hash = ARGV[7]
-local periodic_tasks_queue = ARGV[8]
-local all_brokers_hash_key = ARGV[9]
-local all_brokers_zset_key = ARGV[10]
-local broker_info_json = ARGV[11]
-local broker_dead_threshold_seconds = ARGV[12]
--- uuids starting at ARGV[13]
+local namespace = ARGV[1]
+local future_jobs = ARGV[2]
+local notifications = ARGV[3]
+local now = ARGV[4]
+local job_status_queued = tonumber(ARGV[5])
+local periodic_tasks_hash = ARGV[6]
+local periodic_tasks_queue = ARGV[7]
+local all_brokers_hash_key = ARGV[8]
+local all_brokers_zset_key = ARGV[9]
+local broker_info_json = ARGV[10]
+local broker_dead_threshold_seconds = ARGV[11]
+-- uuids starting at ARGV[12]
 -- lua in Redis cannot generate random UUIDs, so they are generated in Python
 -- and passed with each calls
 
@@ -28,7 +27,7 @@ local jobs_json = redis.call('zrangebyscore', future_jobs, '-inf', now, 'LIMIT',
 local jobs_moved = 0
 
 -- Create jobs from due periodic tasks
-local number_of_uuids = #ARGV + 1 - 13  -- as uuids start at ARGV[13]
+local number_of_uuids = #ARGV + 1 - 12  -- as uuids start at ARGV[12]
 local task_names = redis.call('zrangebyscore', periodic_tasks_queue, '-inf', now, 'LIMIT', 0, number_of_uuids)
 for i, task_name in ipairs(task_names) do
 
@@ -40,7 +39,7 @@ for i, task_name in ipairs(task_names) do
     else
         local task = cjson.decode(task_json)
         local job = {}
-        job["id"] = ARGV[13 + i - 1]
+        job["id"] = ARGV[12 + i - 1]
         job["status"] = job_status_queued
         job["task_name"] = task_name
         job["queue"] = task["queue"]

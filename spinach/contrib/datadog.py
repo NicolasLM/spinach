@@ -7,8 +7,6 @@ def register_datadog(tracer=None, namespace: Optional[str]=None,
                      service: str='spinach'):
     """Register the Datadog integration.
 
-    Exceptions making jobs fail are sent to Sentry.
-
     :param tracer: optionally use a custom ddtrace Tracer instead of the global
            one.
     :param namespace: optionally only register the Datadog integration for a
@@ -42,3 +40,24 @@ def register_datadog(tracer=None, namespace: Optional[str]=None,
     def job_schedule_retry(namespace, job, **kwargs):
         root_span = tracer.current_root_span()
         root_span.set_traceback()
+
+
+def register_datadog_if_module_patched(module: str, *args, **kwargs) -> bool:
+    """Register the datadog integration if ddtrace is already used.
+
+    This can be used to enable datadog for Spinach only if datadog
+    is enabled for Django.
+
+    :param module: Name of the module that must already be patched
+    :return: boolean telling if the integration was registered
+    """
+    try:
+        from ddtrace.monkey import get_patched_modules
+    except ImportError:
+        return False
+
+    if module not in get_patched_modules():
+        return False
+
+    register_datadog(*args, **kwargs)
+    return True

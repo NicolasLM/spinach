@@ -209,7 +209,7 @@ Sentry
 
 With the Sentry integration, failing jobs can be automatically reported to
 `Sentry <https://sentry.io>`_ with full traceback, log breadcrumbs and job
-information.
+information. Moreover performance tracing of task is enabled.
 
 The Sentry integration requires `Sentry SDK
 <https://pypi.org/project/sentry-sdk/>`_::

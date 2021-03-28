@@ -19,7 +19,7 @@ Distinctive features:
   <https://spinach.readthedocs.io/en/stable/user/integrations.html>`_
 - Embeddable workers for easier testing
 - Python 3, threaded, explicit... see `design choices
-  <https://spinach.readthedocs.io/en/latest/user/design.html>`_ for more
+  <https://spinach.readthedocs.io/en/stable/user/design.html>`_ for more
   details
 
 Quickstart
@@ -53,7 +53,7 @@ Documentation
 -------------
 
 The documentation is at `https://spinach.readthedocs.io
-<https://spinach.readthedocs.io/en/latest/index.html>`_.
+<https://spinach.readthedocs.io/en/stable/index.html>`_.
 
 License
 -------

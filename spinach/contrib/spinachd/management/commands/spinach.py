@@ -36,7 +36,7 @@ class Command(BaseCommand):
         # to trace Django.
         register_datadog_if_module_patched(
             'django',
-            namespance=spin.namespace
+            namespace=spin.namespace
         )
 
         spin.start_workers(

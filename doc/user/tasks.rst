@@ -109,6 +109,22 @@ A task can also raise a :class:`AbortException` for short-circuit behavior:
 
 .. autoclass:: spinach.task.AbortException
 
+Limiting task concurrency
+-------------------------
+
+If a task is idempotent it may also have a limit on the number of
+concurrent jobs spawned across all workers. These types of tasks are
+defined with a positive `max_concurrency` value::
+
+    @tasks.task(name='foo', max_retries=10, max_concurrency=1)
+    def foo(a, b):
+        pass
+
+With this definition, no more than one instance of the Task will ever be
+spawned as a running Job, no matter how many are queued and waiting to
+run.
+
+
 Periodic tasks
 --------------
 

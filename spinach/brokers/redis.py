@@ -17,7 +17,8 @@ from ..task import Task
 from ..const import (
     FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY,
     PERIODIC_TASKS_HASH_KEY, PERIODIC_TASKS_QUEUE_KEY,
-    DEFAULT_ENQUEUE_JOB_RETRIES, ALL_BROKERS_HASH_KEY, ALL_BROKERS_ZSET_KEY
+    DEFAULT_ENQUEUE_JOB_RETRIES, ALL_BROKERS_HASH_KEY, ALL_BROKERS_ZSET_KEY,
+    MAX_CONCURRENCY_KEY, CURRENT_CONCURRENCY_KEY,
 )
 from ..utils import run_forever, call_with_retry
 
@@ -57,9 +58,15 @@ class RedisBroker(Broker):
         self._get_jobs_from_queue = self._load_script(
             'get_jobs_from_queue.lua'
         )
+        self._remove_job_from_running = self._load_script(
+            'remove_job_from_running.lua'
+        )
         self._move_future_jobs = self._load_script('move_future_jobs.lua')
         self._register_periodic_tasks = self._load_script(
             'register_periodic_tasks.lua'
+        )
+        self._set_concurrency_keys = self._load_script(
+            'set_concurrency_keys.lua'
         )
         self._reset()
 
@@ -107,7 +114,11 @@ class RedisBroker(Broker):
 
         return rv
 
-    def enqueue_jobs(self, jobs: Iterable[Job]):
+    def is_queue_empty(self, queue: str) -> bool:
+        """Return True if the provided queue is empty."""
+        return self._r.llen(self._to_namespaced(queue)) == 0
+
+    def enqueue_jobs(self, jobs: Iterable[Job], from_failure: bool=False):
         """Enqueue a batch of jobs."""
         jobs_to_queue = list()
         for job in jobs:
@@ -124,6 +135,9 @@ class RedisBroker(Broker):
                 self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
                 self.namespace,
                 self._to_namespaced(FUTURE_JOBS_KEY),
+                self._to_namespaced(MAX_CONCURRENCY_KEY),
+                self._to_namespaced(CURRENT_CONCURRENCY_KEY),
+                1 if from_failure else 0,
                 *jobs_to_queue
             )
 
@@ -188,7 +202,9 @@ class RedisBroker(Broker):
             self._to_namespaced(queue),
             self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
             JobStatus.RUNNING.value,
-            max_jobs
+            max_jobs,
+            self._to_namespaced(MAX_CONCURRENCY_KEY),
+            self._to_namespaced(CURRENT_CONCURRENCY_KEY),
         )
 
         jobs = json.loads(jobs_json_string.decode())
@@ -198,10 +214,14 @@ class RedisBroker(Broker):
 
     def remove_job_from_running(self, job: Job):
         if job.max_retries > 0:
-            self._r.hdel(
+            self._run_script(
+                self._remove_job_from_running,
                 self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
-                str(job.id)
+                self._to_namespaced(MAX_CONCURRENCY_KEY),
+                self._to_namespaced(CURRENT_CONCURRENCY_KEY),
+                job.serialize(),
             )
+
         self._something_happened.set()
 
     def _subscriber_func(self):
@@ -272,19 +292,38 @@ class RedisBroker(Broker):
             self._to_namespaced(ALL_BROKERS_HASH_KEY),
             self._to_namespaced(ALL_BROKERS_ZSET_KEY),
             self.namespace,
-            self._to_namespaced(NOTIFICATIONS_KEY)
+            self._to_namespaced(NOTIFICATIONS_KEY),
+            self._to_namespaced(MAX_CONCURRENCY_KEY),
+            self._to_namespaced(CURRENT_CONCURRENCY_KEY),
         )
 
     def register_periodic_tasks(self, tasks: Iterable[Task]):
         """Register tasks that need to be scheduled periodically."""
-        tasks = [task.serialize() for task in tasks]
-        self._number_periodic_tasks = len(tasks)
+        _tasks = [task.serialize() for task in tasks]
+        self._number_periodic_tasks = len(_tasks)
         self._run_script(
             self._register_periodic_tasks,
             math.ceil(datetime.now(timezone.utc).timestamp()),
             self._to_namespaced(PERIODIC_TASKS_HASH_KEY),
             self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
-            *tasks
+            *_tasks
+        )
+
+    def set_concurrency_keys(self, tasks: Iterable[Task]):
+        """For each Task, set up its concurrency keys.
+
+        The Lua script handles the logic of:
+            - removing dead keys where a Task was removed
+            - only setting keys where max_concurrency > 0
+        """
+        _tasks = [task.serialize() for task in tasks]
+        if not _tasks:
+            return
+        self._run_script(
+            self._set_concurrency_keys,
+            self._to_namespaced(MAX_CONCURRENCY_KEY),
+            self._to_namespaced(CURRENT_CONCURRENCY_KEY),
+            *_tasks,
         )
 
     def inspect_periodic_tasks(self) -> List[Tuple[int, str]]:

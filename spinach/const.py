@@ -1,4 +1,4 @@
-VERSION = '0.0.13'
+VERSION = '0.0.14'
 
 DEFAULT_QUEUE = 'spinach'
 DEFAULT_NAMESPACE = 'spinach'
@@ -13,5 +13,7 @@ PERIODIC_TASKS_HASH_KEY = '_periodic_tasks_hash'
 PERIODIC_TASKS_QUEUE_KEY = '_periodic_tasks_queue'
 ALL_BROKERS_HASH_KEY = '_all_brokers_hash'
 ALL_BROKERS_ZSET_KEY = '_all_brokers_zset'
+MAX_CONCURRENCY_KEY = '_max_concurrency'
+CURRENT_CONCURRENCY_KEY = '_current_concurrency'
 
 WAIT_FOR_EVENT_MAX_SECONDS = 60

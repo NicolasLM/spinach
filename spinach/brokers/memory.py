@@ -23,6 +23,8 @@ class MemoryBroker(Broker):
         self._future_jobs = list()
         self._running_jobs = list()
         self._scheduler = sched.scheduler()
+        self._max_concurrency_keys = dict()
+        self._cur_concurrency_keys = dict()
 
     def _get_queue(self, queue_name: str):
         queue_name = self._to_namespaced(queue_name)
@@ -34,9 +36,16 @@ class MemoryBroker(Broker):
                 self._queues[queue_name] = queue
                 return queue
 
-    def enqueue_jobs(self, jobs: Iterable[Job]):
+    def enqueue_jobs(self, jobs: Iterable[Job], from_failure: bool=False):
         """Enqueue a batch of jobs."""
         for job in jobs:
+            with self._lock:
+                if from_failure:
+                    max_concurrency = self._max_concurrency_keys[
+                        job.task_name
+                    ]
+                    if max_concurrency is not None:
+                        self._cur_concurrency_keys[job.task_name] -= 1
             if job.should_start:
                 job.status = JobStatus.QUEUED
                 queue = self._get_queue(job.queue)
@@ -70,6 +79,11 @@ class MemoryBroker(Broker):
         self._scheduler.run(blocking=False)
 
         return num_jobs_moved
+
+    def set_concurrency_keys(self, tasks: Iterable[Task]):
+        for task in tasks:
+            self._max_concurrency_keys[task.name] = task.max_concurrency
+            self._cur_concurrency_keys[task.name] = 0
 
     def register_periodic_tasks(self, tasks: Iterable[Task]):
         """Register tasks that need to be scheduled periodically."""
@@ -121,18 +135,46 @@ class MemoryBroker(Broker):
             except IndexError:
                 return None
 
+    def is_queue_empty(self, queue: str):
+        return self._get_queue(queue).qsize() == 0
+
     def get_jobs_from_queue(self, queue: str, max_jobs: int) -> List[Job]:
         """Get jobs from a queue."""
         rv = list()
-        while len(rv) < max_jobs:
-            try:
-                job_json_string = self._get_queue(queue).get(block=False)
-            except Empty:
-                break
+        jobs_to_re_add = list()
+        with self._lock:
+            while len(rv) < max_jobs:
+                try:
+                    job_json_string = self._get_queue(queue).get(block=False)
+                except Empty:
+                    break
 
-            job = Job.deserialize(job_json_string)
-            job.status = JobStatus.RUNNING
-            rv.append(job)
+                job = Job.deserialize(job_json_string)
+                max_concurrency = self._max_concurrency_keys.get(job.task_name)
+                cur_concurrency = self._cur_concurrency_keys.get(job.task_name)
+                if (
+                    max_concurrency is not None and
+                    cur_concurrency >= max_concurrency
+                ):
+                    jobs_to_re_add.append(job_json_string)
+
+                else:
+                    job.status = JobStatus.RUNNING
+                    rv.append(job)
+                    if max_concurrency is not None:
+                        self._cur_concurrency_keys[job.task_name] += 1
+
+            # Re-add jobs that could not be run due to max_concurrency
+            # limits. Queue does not have a way to insert at the front, so
+            # sadly they go straight to the back again. Given that
+            # MemoryBroker is generally only used for testing, this should
+            # not be a great hardship.
+            logger.debug(
+                "Re-adding %s jobs due to concurrency limits",
+                len(jobs_to_re_add)
+            )
+            for job in jobs_to_re_add:
+                self._get_queue(queue).put(job)
 
         return rv
 
@@ -154,5 +196,13 @@ class MemoryBroker(Broker):
 
         Easy, the memory broker doesn't track running jobs. If the broker dies
         there is nothing we can do.
+
+        We still need to decrement the current_concurrency count,
+        however, if it exists.
         """
+        with self._lock:
+            max_concurrency = self._max_concurrency_keys[job.task_name]
+            if max_concurrency is not None:
+                self._cur_concurrency_keys[job.task_name] -= 1
+
         self._something_happened.set()

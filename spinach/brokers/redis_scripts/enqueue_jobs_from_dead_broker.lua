@@ -4,6 +4,8 @@ local all_brokers_hash_key = ARGV[3]
 local all_brokers_zset_key = ARGV[4]
 local namespace = ARGV[5]
 local notifications = ARGV[6]
+local max_concurrency_key = ARGV[7]
+local current_concurrency_key = ARGV[8]
 
 local num_enqueued_jobs = 0
 
@@ -25,6 +27,13 @@ for _, job_json in ipairs(jobs_json) do
 
         -- Serialize the job so that it can be put in the queue
         local job_json = cjson.encode(job)
+
+        -- Decrement the current concurrency if we are tracking
+        -- concurrency on the Task.
+        local max_concurrency = tonumber(redis.call('hget', max_concurrency_key, job['task_name']))
+        if max_concurrency ~= nil and max_concurrency ~= -1 then
+            redis.call('hincrby', current_concurrency_key, job['task_name'], -1)
+        end
 
         -- Enqueue the job
         local queue = string.format("%s/%s", namespace, job["queue"])

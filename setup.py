@@ -67,7 +67,9 @@ setup(
             'flush.lua',
             'get_jobs_from_queue.lua',
             'move_future_jobs.lua',
-            'register_periodic_tasks.lua'
+            'register_periodic_tasks.lua',
+            'remove_job_from_running.lua',
+            'set_concurrency_keys.lua',
         ],
     },
 )

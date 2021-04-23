@@ -14,6 +14,7 @@ Distinctive features:
 
 - At-least-once or at-most-once delivery per task
 - Periodic tasks without an additional process
+- Concurrency limits on queued jobs
 - Scheduling of tasks in batch
 - Integrations with `Flask, Django, Logging, Sentry and Datadog
   <https://spinach.readthedocs.io/en/stable/user/integrations.html>`_

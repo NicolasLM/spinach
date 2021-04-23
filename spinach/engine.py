@@ -140,17 +140,23 @@ class Engine:
     def _arbiter_func(self, stop_when_queue_empty=False):
         logger.debug('Arbiter started')
         self._register_periodic_tasks()
+        self._broker.set_concurrency_keys(
+            [task for task in self._tasks.tasks.values()]
+        )
         while not self._must_stop.is_set():
 
             self._broker.move_future_jobs()
 
             received_jobs = 0
             available_slots = self._workers.available_slots
+            logger.debug("Available slots: %s", available_slots)
             if available_slots > 0:
+                logger.debug("Getting jobs from queue %s", self._working_queue)
                 jobs = self._broker.get_jobs_from_queue(
                     self._working_queue, available_slots
                 )
                 for job in jobs:
+                    logger.debug("Received job: %s", job)
                     received_jobs += 1
                     try:
                         job.task_func = self._tasks.get(job.task_name).func
@@ -165,7 +171,8 @@ class Engine:
                         self._workers.submit_job(job)
 
                 if (stop_when_queue_empty and available_slots > 0
-                        and received_jobs == 0):
+                        and received_jobs == 0
+                        and self._broker.is_queue_empty(self._working_queue)):
                     logger.info("Stopping workers because queue '%s' is empty",
                                 self._working_queue)
                     self.stop_workers(_join_arbiter=False)
@@ -263,7 +270,7 @@ class Engine:
             if job.status in (JobStatus.SUCCEEDED, JobStatus.FAILED):
                 self._broker.remove_job_from_running(job)
             elif job.status is JobStatus.NOT_SET:
-                self._broker.enqueue_jobs([job])
+                self._broker.enqueue_jobs([job], from_failure=True)
             else:
                 raise RuntimeError('Received job with an incorrect status')
 

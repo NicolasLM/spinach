@@ -9,6 +9,7 @@ Distinctive features:
 
 - At-least-once or at-most-once delivery per task
 - Periodic tasks without an additional process
+- Concurrency limits on queued jobs
 - Scheduling of tasks in batch
 - Embeddable workers for easier testing
 - Integrations with :ref:`Flask, Django, Logging, Sentry and Datadog

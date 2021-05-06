@@ -32,13 +32,23 @@ The code base follows `pep8 <https://www.python.org/dev/peps/pep-0008/>`_
 guidelines with lines wrapping at the 79th character. You can verify that the
 code follows the conventions with::
 
-    $ pep8 spinach tests
+    $ pycodestyle --ignore=E252,W503,W504 spinach tests
 
 Running tests is an invaluable help when adding a new feature or when
 refactoring. Try to add the proper test cases in ``tests/`` together with your
 patch. The test suite can be run with pytest::
 
     $ pytest tests
+
+Because the Redis broker tests require a running Redis server, there is also a
+convenience `tox.ini` that runs all the tests and pep8 checks for you after
+starting Redis in a container via docker-compose.  Simply running::
+
+    $ tox
+
+will build a virtualenv, install Spinach and its dependencies into it,
+start the Redis server in the container, and run tests and pycodestyle,
+tearing down the Redis server container when done.
 
 Compatibility
 -------------

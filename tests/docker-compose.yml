@@ -1,0 +1,9 @@
+version: '2.1'
+services:
+    redis:
+        image: docker.io/redis:latest
+        command: "--appendonly yes"
+        ports:
+            - 6379:6379
+        volumes:
+            - /tmp/redis-data:/data

@@ -86,6 +86,18 @@ class Broker(ABC):
         """Register tasks that need to be scheduled periodically."""
 
     @abstractmethod
+    def set_concurrency_keys(self, tasks: Iterable[Task]):
+        """Register concurrency data for Tasks.
+
+        Set up anything in the Broker that is required to track
+        concurrency on Tasks, where a Task defines max_concurrency.
+        """
+
+    @abstractmethod
+    def is_queue_empty(self, queue: str) -> bool:
+        """Return True if the provided queue is empty."""
+
+    @abstractmethod
     def inspect_periodic_tasks(self) -> List[Tuple[int, str]]:
         """Get the next periodic task schedule.
 
@@ -93,7 +105,7 @@ class Broker(ABC):
         """
 
     @abstractmethod
-    def enqueue_jobs(self, jobs: Iterable[Job]):
+    def enqueue_jobs(self, jobs: Iterable[Job], from_failure: bool):
         """Enqueue a batch of jobs."""
 
     @abstractmethod

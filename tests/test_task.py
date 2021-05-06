@@ -12,7 +12,7 @@ from .conftest import get_now
 
 @pytest.fixture
 def task():
-    return Task(print, 'write_to_stdout', 'foo_queue', 0, None)
+    return Task(print, 'write_to_stdout', 'foo_queue', 0, None, None)
 
 
 def test_task(task):
@@ -37,6 +37,15 @@ def test_task_eq(task):
     assert task != task_2
 
 
+def test_task_repr(task):
+    task_repr = repr(task)
+    expected = 'Task({}, {}, {}, {}, {}, {})'.format(
+        task.func, task.name, task.queue, task.max_retries,
+        task.periodicity, task.max_concurrency,
+    )
+    assert task_repr == expected
+
+
 def test_tasks_add(task):
     tasks = Tasks()
     tasks.add(print, 'write_to_stdout', queue='foo_queue')
@@ -57,14 +66,16 @@ def test_tasks_add(task):
 
 def test_task_serialize(task):
     expected = (
-        '{"max_retries": 0, "name": "write_to_stdout", '
+        '{"max_concurrency": -1, "max_retries": 0, '
+        '"name": "write_to_stdout", '
         '"periodicity": null, "queue": "foo_queue"}'
     )
     assert task.serialize() == expected
 
     task.periodicity = timedelta(minutes=5)
     expected = (
-        '{"max_retries": 0, "name": "write_to_stdout", '
+        '{"max_concurrency": -1, "max_retries": 0, '
+        '"name": "write_to_stdout", '
         '"periodicity": 300, "queue": "foo_queue"}'
     )
     assert task.serialize() == expected
@@ -239,3 +250,27 @@ def test_batch(patch_now):
         ('foo_task', now, (1, 2), {}),
         ('bar_task', now, (), {'three': True})
     ]
+
+
+def test_task_raises_for_concurrency_without_idempotency():
+    with pytest.raises(ValueError) as e:
+        task = Task(
+            print, 'foo', 'foo_queue', max_retries=None,
+            periodicity=None, max_concurrency=1
+        )
+    assert "max_retries must be set if max_concurrency is set" in str(e)
+    with pytest.raises(ValueError) as e:
+        task = Task(
+            print, 'foo', 'foo_queue', max_retries=0,
+            periodicity=None, max_concurrency=1
+        )
+    assert "max_retries must be set if max_concurrency is set" in str(e)
+
+
+def test_task_raises_if_max_concurrency_less_than_one():
+    with pytest.raises(ValueError) as e:
+        task = Task(
+            print, 'foo', 'foo_queue', max_retries=1,
+            periodicity=None, max_concurrency=0
+        )
+    assert "max_concurrency must be greater than zero" in str(e)

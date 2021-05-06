@@ -9,15 +9,30 @@ from . import const, exc
 
 class Task:
 
-    __slots__ = ['func', 'name', 'queue', 'max_retries', 'periodicity']
+    __slots__ = [
+        'func', 'name', 'queue', 'max_retries', 'periodicity',
+        'max_concurrency',
+    ]
 
     def __init__(self, func: Callable, name: str, queue: str,
-                 max_retries: Number, periodicity: Optional[timedelta]):
+                 max_retries: Number, periodicity: Optional[timedelta],
+                 max_concurrency: Optional[int]=None):
         self.func = func
         self.name = name
         self.queue = queue
         self.max_retries = max_retries
         self.periodicity = periodicity
+        self.max_concurrency = max_concurrency
+
+        # Prevent initialisation with max_concurrency set and
+        # max_retries not set.
+        if max_concurrency is not None:
+            if max_retries is None or max_retries == 0:
+                raise ValueError(
+                    "max_retries must be set if max_concurrency is set"
+                )
+            if max_concurrency < 1:
+                raise ValueError("max_concurrency must be greater than zero")
 
     def serialize(self):
         periodicity = (int(self.periodicity.total_seconds())
@@ -26,7 +41,8 @@ class Task:
             'name': self.name,
             'queue': self.queue,
             'max_retries': self.max_retries,
-            'periodicity': periodicity
+            'periodicity': periodicity,
+            'max_concurrency': self.max_concurrency or -1,
         }, sort_keys=True)
 
     @property
@@ -34,9 +50,9 @@ class Task:
         return self.name
 
     def __repr__(self):
-        return 'Task({}, {}, {}, {}, {})'.format(
+        return 'Task({}, {}, {}, {}, {}, {})'.format(
             self.func, self.name, self.queue, self.max_retries,
-            self.periodicity
+            self.periodicity, self.max_concurrency,
         )
 
     def __eq__(self, other):
@@ -59,17 +75,21 @@ class Tasks:
     :arg max_retries: default retry policy for tasks
     :arg periodicity: for periodic tasks, delay between executions as a
          timedelta
+    :arg max_concurrency: maximum number of simultaneous Jobs that can be
+        started for this Task. Requires max_retries to be also set.
     """
     # This class is not thread-safe because it doesn't need to be used
     # concurrently.
 
     def __init__(self, queue: Optional[str]=None,
                  max_retries: Optional[Number]=None,
-                 periodicity: Optional[timedelta]=None):
+                 periodicity: Optional[timedelta]=None,
+                 max_concurrency: Optional[int]=None):
         self._tasks = {}
         self.queue = queue
         self.max_retries = max_retries
         self.periodicity = periodicity
+        self.max_concurrency = max_concurrency
         self._spin = None
 
     def update(self, tasks: 'Tasks'):
@@ -98,7 +118,8 @@ class Tasks:
 
     def task(self, func: Optional[Callable]=None, name: Optional[str]=None,
              queue: Optional[str]=None, max_retries: Optional[Number]=None,
-             periodicity: Optional[timedelta]=None):
+             periodicity: Optional[timedelta]=None,
+             max_concurrency: Optional[int]=None):
         """Decorator to register a task function.
 
         :arg name: name of the task, used later to schedule jobs
@@ -107,6 +128,8 @@ class Tasks:
              not provided
         :arg periodicity: for periodic tasks, delay between executions as a
              timedelta
+        :arg max_concurrency: maximum number of simultaneous Jobs that can be
+            started for this Task. Requires max_retries to be also set.
 
         >>> tasks = Tasks()
         >>> @tasks.task(name='foo')
@@ -116,10 +139,11 @@ class Tasks:
         if func is None:
             return functools.partial(self.task, name=name, queue=queue,
                                      max_retries=max_retries,
-                                     periodicity=periodicity)
+                                     periodicity=periodicity,
+                                     max_concurrency=max_concurrency)
 
         self.add(func, name=name, queue=queue, max_retries=max_retries,
-                 periodicity=periodicity)
+                 periodicity=periodicity, max_concurrency=max_concurrency)
 
         # Add an attribute to the function to be able to conveniently use it as
         # spin.schedule(function) instead of spin.schedule('task_name')
@@ -129,7 +153,8 @@ class Tasks:
 
     def add(self, func: Callable, name: Optional[str]=None,
             queue: Optional[str]=None, max_retries: Optional[Number]=None,
-            periodicity: Optional[timedelta]=None):
+            periodicity: Optional[timedelta]=None,
+            max_concurrency: Optional[int]=None):
         """Register a task function.
 
         :arg func: a callable to be executed
@@ -139,6 +164,8 @@ class Tasks:
              not provided
         :arg periodicity: for periodic tasks, delay between executions as a
              timedelta
+        :arg max_concurrency: maximum number of simultaneous Jobs that can be
+            started for this Task. Requires max_retries to be also set.
 
         >>> tasks = Tasks()
         >>> tasks.add(lambda x: x, name='do_nothing')
@@ -162,12 +189,16 @@ class Tasks:
 
         if periodicity is None:
             periodicity = self.periodicity
+        if max_concurrency is None:
+            max_concurrency = self.max_concurrency
 
         if queue and queue.startswith('_'):
             raise ValueError('Queues starting with "_" are reserved by '
                              'Spinach for internal use')
 
-        self._tasks[name] = Task(func, name, queue, max_retries, periodicity)
+        self._tasks[name] = Task(
+            func, name, queue, max_retries, periodicity, max_concurrency
+        )
 
     def _require_attached_tasks(self):
         if self._spin is None:

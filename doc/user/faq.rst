@@ -32,6 +32,16 @@ is possible but it must not import your actual application using Spinach. This
 is because mixing threads and forks in a single interpreter is a minefield.
 Anyway you are probably better off using a battle tested init system.
 
+How do I get in touch?
+----------------------
+
+Bug reports and feature requests can be sent on `GitHub
+<https://github.com/NicolasLM/spinach>`_.
+
+For help with integrating Spinach to a project or giving feedback there is
+the IRC channel **#spinach** on `irc.libera.chat
+<https://kiwiirc.com/nextclient/irc.libera.chat:+6697/#spinach>`_.
+
 What is the licence?
 --------------------
 

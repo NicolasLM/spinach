@@ -7,6 +7,8 @@ Spinach
     :target: https://coveralls.io/github/NicolasLM/spinach?branch=master
 .. image:: https://readthedocs.org/projects/spinach/badge/?version=latest
     :target: http://spinach.readthedocs.io/en/latest/?badge=latest
+.. image:: https://img.shields.io/badge/IRC-irc.libera.chat-1e72ff.svg?style=flat
+    :target: https://kiwiirc.com/nextclient/irc.libera.chat:+6697/#spinach
 
 Redis task queue for Python 3 heavily inspired by Celery and RQ.
 
@@ -55,6 +57,9 @@ Documentation
 
 The documentation is at `https://spinach.readthedocs.io
 <https://spinach.readthedocs.io/en/stable/index.html>`_.
+
+IRC channel for online discussions **#spinach** on `irc.libera.chat
+<https://kiwiirc.com/nextclient/irc.libera.chat:+6697/#spinach>`_.
 
 License
 -------

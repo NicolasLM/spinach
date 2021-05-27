@@ -53,8 +53,8 @@ tearing down the Redis server container when done.
 Compatibility
 -------------
 
-Spinach runs on all versions of Python starting from 3.5. Tests are run on
-Travis to ensure that.
+Spinach runs on all versions of Python starting from 3.6. Tests are run via
+GitHub actions to ensure that.
 
 Documentation sources
 ---------------------

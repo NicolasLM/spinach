@@ -7,7 +7,7 @@ Prerequisites
 -------------
 
 Spinach is written in Python 3, prior to use it you must make sure you have a
-Python 3.5+ interpreter on your system.
+Python 3.6+ interpreter on your system.
 
 Pip
 ---

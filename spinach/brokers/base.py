@@ -177,6 +177,10 @@ class Broker(ABC):
         :return: Number of jobs that were moved back to the queue.
         """
 
+    @abstractmethod
+    def list_queue(self, queue):
+        """Non-destructively inspect the given queue."""
+
     def _get_broker_info(self) -> Dict[str, Union[None, str, int]]:
         rv = self._broker_info.copy()
         rv['last_seen_at'] = int(time.time())

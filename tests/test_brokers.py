@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import json
 from unittest.mock import patch
 import uuid
 
@@ -137,3 +138,14 @@ def test_periodic_tasks(broker):
     assert r[0][1] == 'foo'
     assert r[1][1] == 'bar'
     assert r[0][0] == r[1][0] - 5
+
+
+def test_list_queue(broker):
+    jobs = [
+        Job('t1', 'q1', get_now(), 0),
+        Job('t2', 'q2', get_now() + timedelta(seconds=10), 0)
+    ]
+    broker.enqueue_jobs(jobs)
+    assert broker.list_queue('q1') == [json.loads(jobs[0].serialize())]
+    assert broker.list_queue('q2') == [json.loads(jobs[1].serialize())]
+    assert broker.list_queue('q3') == []

@@ -96,3 +96,13 @@ def test_start_workers_blocking():
     spin = Engine(MemoryBroker(), namespace='tests')
     spin.start_workers(number=1, block=True, stop_when_queue_empty=True)
     assert not spin._must_stop.is_set()
+
+
+def test_engine_list_queue():
+    s = Engine(MemoryBroker(), namespace='tests')
+    tasks = Tasks()
+    tasks.add(print, 'foo_task', queue='q1')
+    s.attach_tasks(tasks)
+    tasks.schedule('foo_task')
+    [result] = s.list_queue('q1')
+    assert result['task_name'] == 'foo_task'

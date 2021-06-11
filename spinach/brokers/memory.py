@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 from logging import getLogger
 from queue import Queue, Empty
 import sched
@@ -206,3 +207,7 @@ class MemoryBroker(Broker):
                 self._cur_concurrency_keys[job.task_name] -= 1
 
         self._something_happened.set()
+
+    def list_queue(self, queue):
+        """Non-destructively inspect the given queue."""
+        return [json.loads(r) for r in self._get_queue(queue).queue]

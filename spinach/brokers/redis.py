@@ -68,6 +68,7 @@ class RedisBroker(Broker):
         self._set_concurrency_keys = self._load_script(
             'set_concurrency_keys.lua'
         )
+        self._list_queue = self._load_script('list_queue.lua')
         self._reset()
 
     def _reset(self):
@@ -354,6 +355,13 @@ class RedisBroker(Broker):
             return 0
 
         return next_event_time - now
+
+    def list_queue(self, queue):
+        """Non-destructively inspect the given queue."""
+        result = self._run_script(self._list_queue, self._to_namespaced(queue))
+        queue = [json.loads(r.decode()) for r in result]
+
+        return queue
 
 
 def generate_idempotency_token():

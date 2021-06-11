@@ -280,3 +280,7 @@ class Engine:
         periodic_tasks = [task for task in self._tasks.tasks.values()
                           if task.periodicity]
         self._broker.register_periodic_tasks(periodic_tasks)
+
+    def list_queue(self, queue):
+        """Non-destructively inspect the given queue."""
+        return self._broker.list_queue(queue)

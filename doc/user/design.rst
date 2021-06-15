@@ -11,33 +11,22 @@ be summed up as: explicit is better than implicit. Spinach makes sure that it
 does not provide any convenient feature that can backfire in more complex
 usages.
 
-Threaded workers
-----------------
+Threaded & asynchronous workers
+-------------------------------
 
-Spinach workers are threaded while other task queues like Celery or RQ rely on
-processes by default.
+Spinach workers are either threaded or asynchronous while other task queues
+like Celery or RQ rely on processes by default.
 
-Threaded workers work best with IO bound tasks: tasks that make requests to
-other services, query a database or read files. If your task are CPU bound,
-meaning that you do heavy computations in Python, a process based worker will
-be more efficient.
+Threaded and asynchronous workers work best with IO bound tasks: tasks that
+make requests to other services, query a database or read files. If your tasks
+are CPU bound, meaning that you do heavy computations in Python, a process
+based worker will be more efficient.
 
 Tasks in a typical web application are more often than not IO bound. The choice
-of threads as unit of concurrency is a sensible one.
+of threads or coroutines as unit of concurrency is a sensible one.
 
-Threads also have the advantage of being lighter than processes, a system can
-handle more threads than processes before resources get exhausted.
-
-Thread safety
-~~~~~~~~~~~~~
-
-As Spinach workers are threads, care must be taken to make sure that the
-application is thread-safe. The good news is that your application is probably
-already thread-safe: web frameworks are often run threaded as well, so they
-take care of most of the heavy work for you.
-
-You can read an article I wrote for an `introduction to thread-safety
-<https://lemanchet.fr/articles/learning-python-3-threading-module.html>`_.
+Threads and coroutines also have the advantage of being lighter than processes,
+a system can handle more threads than processes before resources get exhausted.
 
 Fork
 ~~~~

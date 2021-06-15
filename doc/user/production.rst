@@ -8,9 +8,9 @@ Advices to read before deploying an application using Spinach to production.
 Spinach
 -------
 
-Since Spinach relies heavily on threads the user's code MUST be thread-safe.
-This is usually quite easy to achieve on a traditional web application because
-frameworks like Flask or Django make that obvious.
+Since by default Spinach executes jobs in a separate threads, the user's code
+must be thread-safe. This is usually quite easy to achieve on a traditional web
+application because frameworks like Flask or Django make that straightforward.
 
 Tasks should not store state in the process between invocations. Instead all
 state must be stored in an external system, like a database or a cache. This
@@ -70,7 +70,7 @@ Spinach:
 - Task `args` and `kwargs` are JSON serializable and small in size
 - Jobs are sent in :class:`Batch` to the broker when multiple jobs are to be
   scheduled at once
-- The user's code is thread-safe
+- The user's code is thread-safe when using the default threaded workers
 - Tasks do not store state in the process between invocations
 - Logging is configured and exceptions are sent to Sentry, see
   :doc:`integrations`

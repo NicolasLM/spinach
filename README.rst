@@ -14,6 +14,7 @@ Redis task queue for Python 3 heavily inspired by Celery and RQ.
 
 Distinctive features:
 
+- Threaded and asyncio workers
 - At-least-once or at-most-once delivery per task
 - Periodic tasks without an additional process
 - Concurrency limits on queued jobs
@@ -21,7 +22,7 @@ Distinctive features:
 - Integrations with `Flask, Django, Logging, Sentry and Datadog
   <https://spinach.readthedocs.io/en/stable/user/integrations.html>`_
 - Embeddable workers for easier testing
-- Python 3, threaded, explicit... see `design choices
+- See `design choices
   <https://spinach.readthedocs.io/en/stable/user/design.html>`_ for more
   details
 

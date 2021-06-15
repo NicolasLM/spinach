@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 from logging import getLogger
 import threading
+from typing import Type
 
 from .task import Tasks, Batch, Schedulable
 from .utils import run_forever, handle_sigterm
 from .job import Job, JobStatus, advance_job_status
 from .brokers.base import Broker
 from .const import DEFAULT_QUEUE, DEFAULT_NAMESPACE, DEFAULT_WORKER_NUMBER
-from .worker import Workers
+from .worker import BaseWorkers, ThreadWorkers
 from . import exc
 
 
@@ -185,17 +186,21 @@ class Engine:
 
         logger.debug('Arbiter terminated')
 
-    def start_workers(self, number: int=DEFAULT_WORKER_NUMBER,
-                      queue=DEFAULT_QUEUE, block=True,
-                      stop_when_queue_empty=False):
+    def start_workers(self, number: int = DEFAULT_WORKER_NUMBER,
+                      queue: str = DEFAULT_QUEUE, block: bool = True,
+                      stop_when_queue_empty=False,
+                      workers_class: Type[BaseWorkers] = ThreadWorkers):
         """Start the worker threads.
 
-        :arg number: number of worker threads to launch
-        :arg queue: name of the queue to consume, see :doc:`queues`
+        :arg number: number of workers to launch, each job running uses one
+                     worker.
+        :arg queue: name of the queue to consume, see :doc:`queues`.
         :arg block: whether to block the calling thread until a signal arrives
-             and workers get terminated
+             and workers get terminated.
         :arg stop_when_queue_empty: automatically stop the workers when the
              queue is empty. Useful mostly for one-off scripts and testing.
+        :arg worker_class: Class to change the behavior of workers,
+             defaults to threaded workers
         """
         if self._arbiter or self._workers:
             raise RuntimeError('Workers are already running')
@@ -213,7 +218,7 @@ class Engine:
         self._broker.start()
 
         # Start workers
-        self._workers = Workers(
+        self._workers = workers_class(
             num_workers=number,
             namespace=self.namespace,
         )

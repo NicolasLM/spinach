@@ -173,6 +173,8 @@ directly on the :class:`Engine` using::
 .. autoclass:: spinach.task.Tasks
     :members:
 
+.. _batch:
+
 Batch
 -----
 

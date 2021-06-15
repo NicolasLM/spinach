@@ -1,17 +1,24 @@
 from datetime import datetime, timezone
 from unittest.mock import Mock, ANY
 import time
+import sys
 
 import pytest
 
 from spinach import signals
-from spinach.worker import MaxUnfinishedQueue, Workers
+from spinach.worker import ThreadWorkers, AsyncioWorkers
 from spinach.job import Job
 
 
-@pytest.fixture
-def workers():
-    workers = Workers(2, 'tests')
+# Spinach does not support AsyncIO on Python 3.6
+workers_to_test = [ThreadWorkers]
+if sys.version_info >= (3, 7):
+    workers_to_test.append(AsyncioWorkers)
+
+
+@pytest.fixture(params=workers_to_test)
+def workers(request):
+    workers = request.param(2, 'tests')
     yield workers
     workers.stop()
 
@@ -26,7 +33,7 @@ def job():
     return job, task_func
 
 
-def wait_for_queue_empty(workers: Workers, timeout=10):
+def wait_for_queue_empty(workers: ThreadWorkers, timeout=10):
     for _ in range(timeout * 10):
         if workers._in_queue.empty():
             return
@@ -34,37 +41,6 @@ def wait_for_queue_empty(workers: Workers, timeout=10):
         time.sleep(0.1)
 
     raise RuntimeError('Queue did not get empty after {}s'.format(timeout))
-
-
-def test_max_unfinished_queue():
-    queue = MaxUnfinishedQueue(maxsize=2)
-    assert queue.empty()
-    assert queue.available_slots() == 2
-
-    queue.put(None)
-    assert not queue.full()
-    assert not queue.empty()
-    assert queue.available_slots() == 1
-
-    queue.put(None)
-    assert queue.full()
-    assert queue.available_slots() == 0
-
-    queue.get()
-    assert queue.full()
-    assert queue.available_slots() == 0
-
-    queue.task_done()
-    assert not queue.full()
-    assert queue.available_slots() == 1
-
-    queue.get()
-    assert not queue.empty()
-    assert queue.available_slots() == 1
-
-    queue.task_done()
-    assert queue.empty()
-    assert queue.available_slots() == 2
 
 
 def test_job_execution(workers, job):
@@ -101,9 +77,14 @@ def test_submit_job_shutdown_workers(workers, job):
         workers.submit_job(job)
 
 
-@pytest.mark.parametrize('number', [0, 5])
+def test_start_0_workers():
+    with pytest.raises(ValueError):
+        ThreadWorkers(0, 'tests')
+
+
+@pytest.mark.parametrize('number', [1, 5])
 def test_start_stop_n_workers(number):
-    workers = Workers(number, 'tests')
+    workers = ThreadWorkers(number, 'tests')
     assert workers._in_queue.maxsize == number
     assert len(workers._threads) == number
     for thread in workers._threads:
@@ -128,7 +109,7 @@ def test_worker_signals(job):
     signals.worker_terminated.connect(mock_worker_terminated_receiver)
 
     ns = 'tests'
-    workers = Workers(1, ns)
+    workers = ThreadWorkers(1, ns)
     workers.submit_job(job)
     wait_for_queue_empty(workers)
     workers.stop()

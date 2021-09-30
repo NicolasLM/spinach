@@ -45,7 +45,7 @@ Example
 
 
 .. note:: If an application defines both sync and async tasks, each kind of task should go in its
-          own :ref:`queue <queues>` so that sync tasks are picked by threaded workers and async
-          tasks by asyncio workers.
+   own :ref:`queue <queues>` so that sync tasks are picked by threaded workers and async tasks by
+   asyncio workers.
 
 .. note:: Not all contrib :ref:`integrations <integrations>` may work with asynchronous workers.

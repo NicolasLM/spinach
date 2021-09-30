@@ -6,14 +6,14 @@ Installation
 Prerequisites
 -------------
 
-Spinach is written in Python 3, prior to use it you must make sure you have a
-Python 3.6+ interpreter on your system.
+Spinach is written in Python 3, prior to use it you must make sure you have a Python 3.6+
+interpreter on your system.
 
 Pip
 ---
 
-If you are familiar with the Python ecosystem, you won't be surprised that
-Spinach can be installed with::
+If you are familiar with the Python ecosystem, you won't be surprised that Spinach can be installed
+with::
 
     $ pip install spinach
 

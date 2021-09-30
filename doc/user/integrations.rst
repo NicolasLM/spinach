@@ -9,10 +9,9 @@ Logging
 -------
 
 Spinach uses the standard Python `logging package
-<https://docs.python.org/3/library/logging.html>`_. Its logger prefix is
-``spinach``. Spinach does nothing else besides creating its loggers and
-emitting log records. The user is responsible for configuring logging before
-starting workers.
+<https://docs.python.org/3/library/logging.html>`_. Its logger prefix is ``spinach``. Spinach does
+nothing else besides creating its loggers and emitting log records. The user is responsible for
+configuring logging before starting workers.
 
 For simple applications it is enough to use::
 
@@ -29,13 +28,13 @@ More complex applications will probably use `dictConfig
 Flask
 -----
 
-The Flask integration follows the spirit of Flask very closely, it provides two
-ways of getting started: a single module approach for minial applications and
-an application factory approach for more scalable code.
+The Flask integration follows the spirit of Flask very closely, it provides two ways of getting
+started: a single module approach for minial applications and an application factory approach for
+more scalable code.
 
-The Spinach extension for Flask pushes an application context for the duration
-of the tasks, which means that it plays well with other extensions like
-Flask-SQLAlchemy and doesn't require extra precautions.
+The Spinach extension for Flask pushes an application context for the duration of the tasks, which
+means that it plays well with other extensions like Flask-SQLAlchemy and doesn't require extra
+precautions.
 
 Single Module
 ~~~~~~~~~~~~~
@@ -45,8 +44,8 @@ Single Module
 Application Factory
 ~~~~~~~~~~~~~~~~~~~
 
-This more complex layout includes an Application Factory ``create_app`` and an
-imaginary ``auth`` Blueprint containing routes and tasks.
+This more complex layout includes an Application Factory ``create_app`` and an imaginary ``auth``
+Blueprint containing routes and tasks.
 
 ``app.py``::
 
@@ -101,12 +100,10 @@ The working queue and the number of threads can be changed with::
 
     $ FLASK_APP=examples.flaskapp flask spinach --queue high-priority --threads 20
 
-.. note::
-    When in development mode, Flask uses its reloader to automatically restart
-    the process when the code changes. When having periodic tasks defined,
-    using the MemoryBroker and Flask reloader users may see their periodic
-    tasks scheduled each time the code changes. If this is a problem, users
-    are encouraged to switch to the RedisBroker for development.
+.. note:: When in development mode, Flask uses its reloader to automatically restart the process
+   when the code changes. When having periodic tasks defined, using the MemoryBroker and Flask
+   reloader users may see their periodic tasks scheduled each time the code changes. If this is
+   a problem, users are encouraged to switch to the RedisBroker for development.
 
 Configuration
 ~~~~~~~~~~~~~
@@ -117,19 +114,17 @@ Configuration
 Django
 ------
 
-A Django application is available for integrating Spinach into Django
-projects.
+A Django application is available for integrating Spinach into Django projects.
 
-To get started, add the application ``spinach.contrib.spinachd`` to
-``settings.py``::
+To get started, add the application ``spinach.contrib.spinachd`` to ``settings.py``::
 
     INSTALLED_APPS = (
         ...
         'spinach.contrib.spinachd',
     )
 
-On startup, Spinach will look for a ``tasks.py`` module in all installed
-applications. For instance ``polls/tasks.py``::
+On startup, Spinach will look for a ``tasks.py`` module in all installed applications. For instance
+``polls/tasks.py``::
 
     from spinach import Tasks
 
@@ -151,8 +146,8 @@ Tasks can be easily scheduled from views::
         question = get_object_or_404(Question, pk=question_id)
         tasks.schedule('polls:close_poll', question.id)
 
-Users of the Django Datadog app get their jobs reported to Datadog APM
-automatically in task workers.
+Users of the Django Datadog app get their jobs reported to Datadog APM automatically in task
+workers.
 
 Running workers
 ~~~~~~~~~~~~~~~
@@ -168,8 +163,8 @@ The working queue and the number of threads can be changed with::
 Sending emails in the background
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Spinach app provides an ``EMAIL_BACKEND`` allowing to send emails as
-background tasks. To use it simply add it to ``settings.py``::
+The Spinach app provides an ``EMAIL_BACKEND`` allowing to send emails as background tasks. To use
+it simply add it to ``settings.py``::
 
     EMAIL_BACKEND = 'spinach.contrib.spinachd.mail.BackgroundEmailBackend'
     SPINACH_ACTUAL_EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -183,13 +178,11 @@ Emails can then be sent using regular Django functions::
 Periodically clearing expired sessions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Projects using ``django.contrib.sessions`` must remove expired session from the
-database from time to time. Django comes with a management command to do that
-manually, but this can be automated.
+Projects using ``django.contrib.sessions`` must remove expired session from the database from time
+to time. Django comes with a management command to do that manually, but this can be automated.
 
-Spinach provides a periodic task, disabled by default, to do that. To enable it
-give it a periodicity in ``settings.py``. For instance to clear sessions once
-per week::
+Spinach provides a periodic task, disabled by default, to do that. To enable it give it
+a periodicity in ``settings.py``. For instance to clear sessions once per week::
 
     from datetime import timedelta
 
@@ -207,9 +200,9 @@ Configuration
 Sentry
 ------
 
-With the Sentry integration, failing jobs can be automatically reported to
-`Sentry <https://sentry.io>`_ with full traceback, log breadcrumbs and job
-information. Moreover performance tracing of task is enabled.
+With the Sentry integration, failing jobs can be automatically reported to `Sentry
+<https://sentry.io>`_ with full traceback, log breadcrumbs and job information. Moreover
+performance tracing of task is enabled.
 
 The Sentry integration requires `Sentry SDK
 <https://pypi.org/project/sentry-sdk/>`_::
@@ -231,11 +224,10 @@ It then just needs to be registered before starting workers::
 Datadog
 -------
 
-With the Datadog integration, all jobs are automatically reported to
-Datadog APM.
+With the Datadog integration, all jobs are automatically reported to Datadog APM.
 
-The integration requires `ddtrace <https://pypi.python.org/pypi/ddtrace>`_, the
-Datadog APM client for Python::
+The integration requires `ddtrace <https://pypi.python.org/pypi/ddtrace>`_, the Datadog APM client
+for Python::
 
     pip install ddtrace
 
@@ -248,8 +240,8 @@ The integration just needs to be registered before starting workers::
     spin = Engine(MemoryBroker())
     spin.start_workers()
 
-This only installs the integration with Spinach, other libraries still need to
-be patched by ddtrace. It is recommended to run your application patched as
-explained in the ddtrace documentation.
+This only installs the integration with Spinach, other libraries still need to be patched by
+ddtrace. It is recommended to run your application patched as explained in the ddtrace
+documentation.
 
 .. autofunction:: spinach.contrib.datadog.register_datadog

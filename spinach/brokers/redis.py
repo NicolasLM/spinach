@@ -9,7 +9,10 @@ from typing import Optional, Iterable, List, Tuple, Dict, Union
 import uuid
 
 from redis import StrictRedis, ConnectionError, TimeoutError
-from redis.client import Script
+try:  # Redis < 4.1.0
+    from redis.client import Script
+except ImportError:  # Redis >= 4.1.0
+    from redis.commands.core import Script
 
 from ..brokers.base import Broker
 from ..job import Job, JobStatus

@@ -187,9 +187,11 @@ class MemoryBroker(Broker):
         # A memory broker is not connected to any other broker
         return [self._get_broker_info()]
 
-    def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
+    def enqueue_jobs_from_dead_broker(
+        self, dead_broker_id: uuid.UUID
+    ) -> Tuple[int, list]:
         # A memory broker cannot be dead
-        return 0
+        return 0, []
 
     def remove_job_from_running(self, job: Job):
         """Remove a job from the list of running ones.

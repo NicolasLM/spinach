@@ -15,7 +15,7 @@ except ImportError:  # Redis >= 4.1.0
     from redis.commands.core import Script
 
 from ..brokers.base import Broker
-from ..job import Job, JobStatus
+from ..job import Job, JobStatus, advance_job_status
 from ..task import Task
 from ..const import (
     FUTURE_JOBS_KEY, NOTIFICATIONS_KEY, RUNNING_JOBS_KEY,
@@ -177,13 +177,23 @@ class RedisBroker(Broker):
                 'Worker %s on %s detected dead, re-enqueuing its jobs',
                 dead_broker['id'], dead_broker['name']
             )
-            num_jobs_re_enqueued = self.enqueue_jobs_from_dead_broker(
-                uuid.UUID(dead_broker['id'])
+            num_jobs_re_enqueued, failed_jobs = (
+                self.enqueue_jobs_from_dead_broker(
+                    uuid.UUID(dead_broker['id'])
+                )
             )
             logger.warning(
                 'Worker %s on %s marked as dead, %d jobs were re-enqueued',
                 dead_broker['id'], dead_broker['name'], num_jobs_re_enqueued
             )
+
+            # Mark failed jobs appropriately.
+            jobs = [Job.deserialize(job) for job in failed_jobs]
+            err = Exception(
+                "Worker %s died and max_retries exceeded" % dead_broker['name']
+            )
+            for job in jobs:
+                advance_job_status(self.namespace, job, duration=0.0, err=err)
 
         logger.debug("Redis moved %s job(s) from future to current queues",
                      num_jobs_moved)
@@ -287,8 +297,10 @@ class RedisBroker(Broker):
         )
         return [json.loads(r.decode()) for r in rv]
 
-    def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
-        return self._run_script(
+    def enqueue_jobs_from_dead_broker(
+        self, dead_broker_id: uuid.UUID
+    ) -> Tuple[int, list]:
+        return tuple(self._run_script(
             self._enqueue_jobs_from_dead_broker,
             str(dead_broker_id),
             self._to_namespaced(RUNNING_JOBS_KEY.format(dead_broker_id)),
@@ -298,7 +310,7 @@ class RedisBroker(Broker):
             self._to_namespaced(NOTIFICATIONS_KEY),
             self._to_namespaced(MAX_CONCURRENCY_KEY),
             self._to_namespaced(CURRENT_CONCURRENCY_KEY),
-        )
+        ))
 
     def register_periodic_tasks(self, tasks: Iterable[Task]):
         """Register tasks that need to be scheduled periodically."""

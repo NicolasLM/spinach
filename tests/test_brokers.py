@@ -96,7 +96,7 @@ def test_flush(broker):
 def test_enqueue_jobs_from_dead_broker(broker):
     # Marking a broker that doesn't exist as dead
     broker_id = uuid.UUID('62664577-cf89-4f6a-ab16-4e20ec8fe4c2')
-    assert broker.enqueue_jobs_from_dead_broker(broker_id) == 0
+    assert broker.enqueue_jobs_from_dead_broker(broker_id) == (0, [])
 
 
 def test_get_broker_info(broker):

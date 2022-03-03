@@ -16,6 +16,7 @@ from spinach.brokers.redis import (
 )
 from spinach.job import Job, JobStatus
 from spinach.task import Task
+from spinach import signals
 
 
 CONCURRENT_TASK_NAME = 'i_am_concurrent'
@@ -281,7 +282,7 @@ def test_enqueue_jobs_from_dead_broker(broker, broker_2):
     assert current == b'1'
 
     # Mark broker as dead, should re-enqueue only the idempotent jobs.
-    assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == 2
+    assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == (2, [])
 
     # Check that the current_concurrency was decremented for job_3.
     current = broker._r.hget(
@@ -301,11 +302,36 @@ def test_enqueue_jobs_from_dead_broker(broker, broker_2):
 
     # Check that a broker can be marked as dead multiple times
     # without duplicating jobs
-    assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == 0
+    assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == (0, [])
+
+
+def test_enqueue_fails_jobs_from_dead_broker_if_max_retries_exceeded(
+    broker, broker_2
+):
+    job_1 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 1)
+    job_1.retries = 1
+    job_2 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 10)
+    broker.enqueue_jobs([job_1, job_2])
+
+    # Start the job.
+    broker.get_jobs_from_queue('foo_queue', 100)
+
+    # Simulate a dead broker.
+    num_requeued, failed_jobs = broker_2.enqueue_jobs_from_dead_broker(
+        broker._id
+    )
+
+    # Check that one was requeued and the one marked failed is job_1.
+    assert num_requeued == 1
+    jobs = [Job.deserialize(job.decode()) for job in failed_jobs]
+    job_1.status = JobStatus.RUNNING
+    assert [job_1] == jobs
 
 
 def test_detect_dead_broker(broker, broker_2):
-    broker_2.enqueue_jobs_from_dead_broker = Mock(return_value=10)
+    broker_2.enqueue_jobs_from_dead_broker = Mock(
+        return_value=(10, [])
+    )
 
     # Register the first broker
     broker.move_future_jobs()
@@ -321,8 +347,34 @@ def test_detect_dead_broker(broker, broker_2):
     )
 
 
+def test_dead_jobs_exceeding_max_retries_are_marked_failed(broker, broker_2):
+    job_1 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 1)
+    job_1.retries = 1
+    # Register the first broker
+    broker.move_future_jobs()
+    broker_2.enqueue_jobs_from_dead_broker = Mock(
+        return_value=(0, [job_1.serialize()])
+    )
+    # Set the 2nd broker to detect dead brokers after 2 seconds of inactivity
+    broker_2.broker_dead_threshold_seconds = 2
+    time.sleep(2.1)
+
+    signal_called = False
+
+    @signals.job_failed.connect
+    def check_job(namespace, job, err, **kwargs):
+        nonlocal signal_called
+        signal_called = True
+        assert job.status == JobStatus.FAILED
+
+    assert 0 == broker_2.move_future_jobs()
+    assert True is signal_called
+
+
 def test_not_detect_deregistered_broker_as_dead(broker, broker_2):
-    broker_2.enqueue_jobs_from_dead_broker = Mock(return_value=10)
+    broker_2.enqueue_jobs_from_dead_broker = Mock(
+        return_value=(10, [])
+    )
 
     # Register and de-register the first broker
     broker.move_future_jobs()

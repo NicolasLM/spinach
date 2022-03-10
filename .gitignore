@@ -9,3 +9,5 @@ doc/_build
 
 .coverage
 .pytest_cache
+
+tags

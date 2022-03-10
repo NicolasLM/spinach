@@ -158,7 +158,9 @@ class Broker(ABC):
         """Return all registered brokers."""
 
     @abstractmethod
-    def enqueue_jobs_from_dead_broker(self, dead_broker_id: uuid.UUID) -> int:
+    def enqueue_jobs_from_dead_broker(
+        self, dead_broker_id: uuid.UUID
+    ) -> Tuple[int, list]:
         """Re-enqueue the jobs that were running on a broker.
 
         Only jobs that can be retired are moved back to the queue, the others

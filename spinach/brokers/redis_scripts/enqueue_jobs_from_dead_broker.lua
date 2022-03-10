@@ -8,6 +8,8 @@ local max_concurrency_key = ARGV[7]
 local current_concurrency_key = ARGV[8]
 
 local num_enqueued_jobs = 0
+local i = 1
+local failed_jobs = {}
 
 -- Get all jobs that were running on the broker before it died
 local jobs_json = redis.call('hvals', running_jobs_key)
@@ -16,7 +18,6 @@ for _, job_json in ipairs(jobs_json) do
     local job = cjson.decode(job_json)
     if job["retries"] < job["max_retries"] then
         job["retries"] = job["retries"] + 1
-
         -- Set job status to queued:
         -- A major difference between retrying a job failing in a worker and
         -- a failing from a dead broker is that the dead broker one is
@@ -39,6 +40,10 @@ for _, job_json in ipairs(jobs_json) do
         local queue = string.format("%s/%s", namespace, job["queue"])
         redis.call('rpush', queue, job_json)
         num_enqueued_jobs = num_enqueued_jobs + 1
+    else
+        -- Keep track of jobs that exceeded the max_retries
+        failed_jobs[i] = job_json
+        i = i + 1
     end
 
     redis.call('hdel', running_jobs_key, job["id"])
@@ -52,4 +57,4 @@ if num_enqueued_jobs > 0 then
     redis.call('publish', notifications, '')
 end
 
-return num_enqueued_jobs
+return {num_enqueued_jobs, failed_jobs}

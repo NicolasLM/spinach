@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from logging import getLogger
 import threading
-from typing import Type
+from typing import Iterable, Type
 
 from .task import Tasks, Batch, Schedulable
 from .utils import run_forever, handle_sigterm
@@ -89,17 +89,21 @@ class Engine:
     def execute(self, task: Schedulable, *args, **kwargs):
         return self._tasks.get(task).func(*args, **kwargs)
 
-    def schedule(self, task: Schedulable, *args, **kwargs):
+    def schedule(self, task: Schedulable, *args, **kwargs) -> Job:
         """Schedule a job to be executed as soon as possible.
 
         :arg task: the task or its name to execute in the background
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
+
+        :return: The Job that was created and scheduled.
         """
         at = datetime.now(timezone.utc)
         return self.schedule_at(task, at, *args, **kwargs)
 
-    def schedule_at(self, task: Schedulable, at: datetime, *args, **kwargs):
+    def schedule_at(
+        self, task: Schedulable, at: datetime, *args, **kwargs
+    ) -> Job:
         """Schedule a job to be executed in the future.
 
         :arg task: the task or its name to execute in the background
@@ -109,21 +113,26 @@ class Engine:
                  contain UTC time.
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
+
+        :return: The Job that was created and scheduled.
         """
         task = self._tasks.get(task)
         job = Job(task.name, task.queue, at, task.max_retries, task_args=args,
                   task_kwargs=kwargs)
         job.task_func = task.func
         job.check_signature()
-        return self._broker.enqueue_jobs([job])
+        self._broker.enqueue_jobs([job])
+        return job
 
-    def schedule_batch(self, batch: Batch):
+    def schedule_batch(self, batch: Batch) -> Iterable[Job]:
         """Schedule many jobs at once.
 
         Scheduling jobs in batches allows to enqueue them fast by avoiding
         round-trips to the broker.
 
         :arg batch: :class:`Batch` instance containing jobs to schedule
+
+        :return: The Jobs that were created and scheduled.
         """
         jobs = list()
         for task, at, args, kwargs in batch.jobs_to_create:
@@ -136,7 +145,8 @@ class Engine:
             job.check_signature()
             jobs.append(job)
 
-        return self._broker.enqueue_jobs(jobs)
+        self._broker.enqueue_jobs(jobs)
+        return jobs
 
     def _arbiter_func(self, stop_when_queue_empty=False):
         logger.debug('Arbiter started')

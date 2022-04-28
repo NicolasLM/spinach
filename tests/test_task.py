@@ -218,13 +218,19 @@ def test_tasks_scheduling(task):
         tasks.schedule_batch(batch)
 
     spin = mock.Mock()
+    job = mock.sentinel
+    spin.schedule.return_value = job
+    spin.schedule_at.return_value = job
+    spin.schedule_batch.return_value = job
     tasks._spin = spin
 
-    tasks.schedule('write_to_stdout')
+    retjob = tasks.schedule('write_to_stdout')
     spin.schedule.assert_called_once_with('write_to_stdout')
+    assert retjob == job
 
-    tasks.schedule_at('write_to_stdout', get_now())
+    retjob = tasks.schedule_at('write_to_stdout', get_now())
     spin.schedule_at.assert_called_once_with('write_to_stdout', get_now())
+    assert retjob == job
 
     tasks.schedule_batch(batch)
     spin.schedule_batch.assert_called_once_with(batch)

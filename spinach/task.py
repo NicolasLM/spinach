@@ -1,10 +1,13 @@
 from datetime import datetime, timezone, timedelta
 import functools
 import json
-from typing import Optional, Callable, List, Union
+from typing import Iterable, Optional, Callable, List, TYPE_CHECKING, Union
 from numbers import Number
 
 from . import const, exc
+
+if TYPE_CHECKING:
+    from .job import Job
 
 
 class Task:
@@ -207,20 +210,24 @@ class Tasks:
                 'a Spinach Engine.'
             )
 
-    def schedule(self, task: Schedulable, *args, **kwargs):
+    def schedule(self, task: Schedulable, *args, **kwargs) -> "Job":
         """Schedule a job to be executed as soon as possible.
 
         :arg task: the task or its name to execute in the background
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
 
+        :return: The Job that was created and scheduled.
+
         This method can only be used once tasks have been attached to a
         Spinach :class:`Engine`.
         """
         self._require_attached_tasks()
-        self._spin.schedule(task, *args, **kwargs)
+        return self._spin.schedule(task, *args, **kwargs)
 
-    def schedule_at(self, task: Schedulable, at: datetime, *args, **kwargs):
+    def schedule_at(
+        self, task: Schedulable, at: datetime, *args, **kwargs
+    ) -> "Job":
         """Schedule a job to be executed in the future.
 
         :arg task: the task or its name to execute in the background
@@ -231,22 +238,26 @@ class Tasks:
         :arg args: args to be passed to the task function
         :arg kwargs: kwargs to be passed to the task function
 
+        :return: The Job that was created and scheduled.
+
         This method can only be used once tasks have been attached to a
         Spinach :class:`Engine`.
         """
         self._require_attached_tasks()
-        self._spin.schedule_at(task, at, *args, **kwargs)
+        return self._spin.schedule_at(task, at, *args, **kwargs)
 
-    def schedule_batch(self, batch: 'Batch'):
+    def schedule_batch(self, batch: 'Batch') -> Iterable["Job"]:
         """Schedule many jobs at once.
 
         Scheduling jobs in batches allows to enqueue them fast by avoiding
         round-trips to the broker.
 
         :arg batch: :class:`Batch` instance containing jobs to schedule
+
+        :return: The Jobs that were created and scheduled.
         """
         self._require_attached_tasks()
-        self._spin.schedule_batch(batch)
+        return self._spin.schedule_batch(batch)
 
 
 class Batch:

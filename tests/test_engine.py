@@ -45,6 +45,48 @@ def test_attach_tasks(mock_logger, spin, spin_2):
     assert spin_2._tasks.tasks == tasks.tasks
 
 
+def test_schedule_at(patch_now):
+    now = get_now()
+
+    tasks = Tasks()
+    tasks.add(print, 'bar_task')
+
+    broker = Mock()
+
+    s = Engine(broker, namespace='tests')
+    s.attach_tasks(tasks)
+
+    job = s.schedule_at('bar_task', now, three=True)
+
+    bar_job = broker.enqueue_jobs.call_args[0][0][0]
+    assert bar_job == job
+    assert bar_job.task_name == 'bar_task'
+    assert bar_job.at == now
+    assert bar_job.task_args == ()
+    assert bar_job.task_kwargs == {'three': True}
+
+
+def test_schedule(patch_now):
+    now = get_now()
+
+    tasks = Tasks()
+    tasks.add(print, 'foo_task')
+
+    broker = Mock()
+
+    s = Engine(broker, namespace='tests')
+    s.attach_tasks(tasks)
+
+    job1 = s.schedule('foo_task', 1, 2)
+
+    foo_job = broker.enqueue_jobs.call_args[0][0][0]
+    assert foo_job == job1
+    assert foo_job.task_name == 'foo_task'
+    assert foo_job.at == now
+    assert foo_job.task_args == (1, 2)
+    assert foo_job.task_kwargs == {}
+
+
 def test_schedule_batch(patch_now):
     now = get_now()
 
@@ -60,17 +102,19 @@ def test_schedule_batch(patch_now):
     batch = Batch()
     batch.schedule('foo_task', 1, 2)
     batch.schedule_at('bar_task', now, three=True)
-    s.schedule_batch(batch)
+    jobs = s.schedule_batch(batch)
 
     broker.enqueue_jobs.assert_called_once_with([ANY, ANY])
 
     foo_job = broker.enqueue_jobs.call_args[0][0][0]
+    assert foo_job in jobs
     assert foo_job.task_name == 'foo_task'
     assert foo_job.at == now
     assert foo_job.task_args == (1, 2)
     assert foo_job.task_kwargs == {}
 
     bar_job = broker.enqueue_jobs.call_args[0][0][1]
+    assert bar_job in jobs
     assert bar_job.task_name == 'bar_task'
     assert bar_job.at == now
     assert bar_job.task_args == ()

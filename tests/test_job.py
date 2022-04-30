@@ -118,10 +118,13 @@ def test_advance_job_status(job):
                        RetryException('Must retry', at=now))
     assert job.status is JobStatus.FAILED
 
+    # The job should have retried twice due to previous tests, ensure that
+    # an AbortException tops off the retry counter
     job.status = JobStatus.RUNNING
     job.max_retries = 10
+    assert job.retries == 2
     advance_job_status('namespace', job, 1.0, AbortException('kaboom'))
-    assert job.max_retries == 0
+    assert job.retries == 10
     assert job.status is JobStatus.FAILED
 
 

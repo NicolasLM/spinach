@@ -189,7 +189,7 @@ def advance_job_status(namespace: str, job: Job, duration: float,
         return
 
     if isinstance(err, AbortException):
-        job.max_retries = 0
+        job.retries = job.max_retries
         logger.error(
             'Fatal error during execution of %s after %s, canceling retries',
             job, duration, exc_info=err

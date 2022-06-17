@@ -126,7 +126,10 @@ class MemoryBroker(Broker):
 
         Used only for debugging and during tests.
         """
-        return [(int(e[0]), e[3][0].name) for e in self._scheduler.queue]
+        return [
+            (int(e.time), e.argument[0].name)
+            for e in self._scheduler.queue
+        ]
 
     def _get_next_future_job(self) -> Optional[Job]:
         with self._lock:

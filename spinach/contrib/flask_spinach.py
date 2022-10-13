@@ -1,12 +1,12 @@
 import click
-from flask import current_app, _app_ctx_stack
+import flask
+
 import spinach
 from spinach import signals
 from spinach.const import DEFAULT_WORKER_NUMBER, DEFAULT_QUEUE
 
 
 class Spinach:
-
     def __init__(self, app=None):
         self.app = app
         if app is not None:
@@ -38,11 +38,40 @@ class Spinach:
 
         @signals.job_started.connect_via(namespace)
         def job_started(*args, job=None, **kwargs):
-            app.app_context().push()
+            if not flask.has_app_context():
+                ctx = app.app_context()
+                ctx.push()
+                flask.g.spinach_ctx = ctx
+            self.job_started(job)
 
         @signals.job_finished.connect_via(namespace)
         def job_finished(*args, job=None, **kwargs):
-            _app_ctx_stack.pop()
+            self.job_finished(job)
+            try:
+                flask.g.spinach_ctx.pop()
+            except AttributeError:
+                # This means we didn't create the context. Ignore.
+                pass
+
+    @classmethod
+    def job_started(cls, *args, job=None, **kwargs):
+        """Callback for subclasses to receive job_started signals.
+
+        There's no guarantee of ordering for Signal's callbacks,
+        so use this callback instead to make sure the app context
+        was pushed.
+        """
+        pass
+
+    @classmethod
+    def job_finished(cls, *args, job=None, **kwargs):
+        """Callback for subclasses to receive job_finished signals.
+
+        There's no guarantee of ordering for Signal's callbacks,
+        so use this callback instead to make sure the app context
+        was pushed.
+        """
+        pass
 
     @property
     def spin(self):
@@ -50,7 +79,7 @@ class Spinach:
             return self.app.extensions['spinach']
 
         try:
-            return current_app.extensions['spinach']
+            return flask.current_app.extensions['spinach']
         except (AttributeError, TypeError, KeyError):
             raise RuntimeError('Spinach extension not initialized. '
                                'Did you forget to call init_app?')

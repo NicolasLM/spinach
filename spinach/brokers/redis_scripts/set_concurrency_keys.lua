@@ -19,11 +19,10 @@ for i=3, #ARGV do
     if max_concurrency ~= -1 then
         new_task_names[task["name"]] = true
 
-        -- Override max_concurrency whatever it is already set to, if
-        -- anything.
-        redis.call('hset', max_concurrency_key, task["name"], max_concurrency)
-        -- Check to see if current_concurrency exists before initialising
-        -- it.
+        -- Check to see if concurrency keys exist before initialising them.
+        if redis.call('hexists', current_concurrency_key, task["name"]) == 0 then
+            redis.call('hset', max_concurrency_key, task["name"], max_concurrency)
+        end
         if redis.call('hexists', current_concurrency_key, task["name"]) == 0 then
             redis.call('hset', current_concurrency_key, task["name"], 0)
         end

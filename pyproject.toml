@@ -1,0 +1,131 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spinach"
+dynamic = ["version"]
+description = "Modern Redis task queue for Python 3"
+readme = "README.rst"
+license-files = { paths = ["LICENSE"] }
+requires-python = ">=3.8.0,<4.0.0"
+authors = [
+    { name = "Nicolas Le Manchet", email = "nicolas@lemanchet.fr" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: System :: Distributed Computing",
+    "License :: OSI Approved :: BSD License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["task", "queue", "jobs", "redis"]
+urls.Source = "https://github.com/NicolasLM/spinach"
+
+dependencies = [
+    "redis",
+    "blinker"
+]
+
+[project.optional-dependencies]
+tests = [
+    "pytest",
+    "pytest-cov",
+    "pytest-threadleak",
+    "ruff",
+    "flask",
+    "django"
+]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "spinach/_version.py"
+
+[tool.hatch.build.targets.sdist]
+ignore-vcs = true
+include = ["/spinach", "/tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["spinach"]
+
+[tool.hatch.build.targets.wheel.package-data]
+"spinach.brokers.redis_scripts" = [
+    "deregister.lua",
+    "enqueue_job.lua",
+    "enqueue_jobs_from_dead_broker.lua",
+    "flush.lua",
+    "get_jobs_from_queue.lua",
+    "move_future_jobs.lua",
+    "register_periodic_tasks.lua",
+    "remove_job_from_running.lua",
+    "set_concurrency_keys.lua",
+]
+
+[tool.hatch.envs.default]
+path = ".hatch"
+features = ["tests"]
+
+scripts.pep8 = ["ruff spinach tests"]
+
+scripts.py3 = [
+    "docker-compose -f tests/docker-compose.yml up -d",
+    "pytest tests {args}",
+    "docker-compose -f tests/docker-compose.yml down",
+]
+
+# A minimalist pytest runner for Github to use
+scripts.ci = ["pytest -v --cov=spinach tests {args}"]
+
+[tool.hatch.envs.docs]
+detatched = true
+dependencies = [
+    "sphinx",
+    "blinker"
+]
+path = ".hatch"
+scripts.build = ["cd doc && make {args}"]
+
+[tool.ruff.lint]
+select = ["B", "C9", "D", "E", "F", "S", "W"]
+ignore = [
+    "B018",  # Useless expression (seems to have false-positive bugs)
+    "S101",  # Use of `assert` detected (conflicts with pytest)
+    "D10",   # Missing docstring in public function / module / etc.
+    "D203",  # 1 blank line required before class docstring
+    "D205",  # 1 blank line required between summary line and description
+    "D213",  # Multi-line docstring summary should start at the second line
+    "D40",   # First line of docstring complaints
+    "D415",  # First line should end with a period, question mark, or exclamation point
+    # TODO(nic): The remaining ignores point to actual issues in the code.
+    #  Remove them and fix the issues later.
+    "B024",
+    "B027",
+    "B904",
+    "D204",
+    "F401",
+    "F841",
+    "S301",
+    "S311",
+]
+# Aggregating symbols into a convenient location for import is good practice
+# for libraries, we don't care if they look unused
+per-file-ignores = { "__init__.py" = ["F401"] }
+mccabe.max-complexity = 13
+
+[tool.coverage.run]
+relative_files = true
+include = ["spinach/*"]
+omit = ["spinach/_version.py"]
+
+[tool.pytest.ini_options]
+threadleak = true

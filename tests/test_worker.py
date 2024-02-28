@@ -125,6 +125,7 @@ def test_worker_signals(job):
 
 
 def test_can_accept_job(workers, job):
+    job, _ = job
     assert workers.available_slots == 2
 
     workers.submit_job(job)

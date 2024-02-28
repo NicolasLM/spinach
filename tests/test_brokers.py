@@ -67,7 +67,7 @@ def test_wait_for_events_no_future_job(broker):
 
         mock_sh.wait.return_value = True
         broker.wait_for_event()
-        mock_sh.clear.called_once()
+        mock_sh.clear.assert_called_once_with()
 
 
 @pytest.mark.parametrize('delta,timeout', [

@@ -65,9 +65,6 @@ def test_call_with_retry(_, mock_sleep):
 
 
 def test_exponential_backoff():
-    with pytest.raises(ValueError):
-        utils.exponential_backoff(0)
-
     assert (
         timedelta(seconds=3) <= utils.exponential_backoff(1)
         <= timedelta(seconds=6)

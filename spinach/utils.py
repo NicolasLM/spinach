@@ -74,8 +74,8 @@ def exponential_backoff(attempt: int, cap: int=1200) -> timedelta:
     :arg cap: maximum delay, defaults to 20 minutes
     """
     base = 3
-    temp = min(base * 2 ** attempt, cap)
-    return timedelta(seconds=temp / 2 + random.randint(0, temp / 2))
+    temp = min(base * 2 ** attempt, cap) // 2
+    return timedelta(seconds=temp + random.randint(0, temp))
 
 
 @contextlib.contextmanager

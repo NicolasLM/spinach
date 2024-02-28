@@ -49,7 +49,7 @@ def test_schedule_at(patch_now):
     now = get_now()
 
     tasks = Tasks()
-    tasks.add(print, 'bar_task')
+    tasks.add(Mock(), 'bar_task')
 
     broker = Mock()
 
@@ -91,8 +91,8 @@ def test_schedule_batch(patch_now):
     now = get_now()
 
     tasks = Tasks()
-    tasks.add(print, 'foo_task')
-    tasks.add(print, 'bar_task')
+    tasks.add(Mock(), 'foo_task')
+    tasks.add(Mock(), 'bar_task')
 
     broker = Mock()
 

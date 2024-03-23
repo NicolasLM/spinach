@@ -79,7 +79,11 @@ def test_running_job(broker):
     broker.enqueue_jobs([job])
     assert broker._r.hget(running_jobs_key, str(job.id)) is None
     broker.get_jobs_from_queue('foo_queue', 1)
-    assert broker._r.hget(running_jobs_key, str(job.id)) is None
+    job.status = JobStatus.RUNNING
+    assert (
+        Job.deserialize(broker._r.hget(running_jobs_key, str(job.id)).decode())
+        == job
+    )
     # Try to remove it, even if it doesn't exist in running
     broker.remove_job_from_running(job)
 
@@ -281,8 +285,13 @@ def test_enqueue_jobs_from_dead_broker(broker, broker_2):
     )
     assert current == b'1'
 
-    # Mark broker as dead, should re-enqueue only the idempotent jobs.
-    assert broker_2.enqueue_jobs_from_dead_broker(broker._id) == (2, [])
+    # Mark broker as dead, should re-enqueue only the idempotent jobs.  The
+    # non-idempotent job will report as failed.
+    num_requeued, failed = broker_2.enqueue_jobs_from_dead_broker(broker._id)
+    assert num_requeued == 2
+    jobs = [Job.deserialize(job.decode()) for job in failed]
+    job_1.status = JobStatus.RUNNING
+    assert [job_1] == jobs
 
     # Check that the current_concurrency was decremented for job_3.
     current = broker._r.hget(
@@ -348,27 +357,31 @@ def test_detect_dead_broker(broker, broker_2):
 
 
 def test_dead_jobs_exceeding_max_retries_are_marked_failed(broker, broker_2):
+    # Idempotent job
     job_1 = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 1)
     job_1.retries = 1
+    # Non-idempotent job
+    job_2 = Job('bar_task', 'foo_queue', datetime.now(timezone.utc), 0)
     # Register the first broker
+    broker.enqueue_jobs([job_1])
+    broker.enqueue_jobs([job_2])
+    broker.get_jobs_from_queue('foo_queue', 100)
     broker.move_future_jobs()
-    broker_2.enqueue_jobs_from_dead_broker = Mock(
-        return_value=(0, [job_1.serialize()])
-    )
     # Set the 2nd broker to detect dead brokers after 2 seconds of inactivity
     broker_2.broker_dead_threshold_seconds = 2
     time.sleep(2.1)
 
-    signal_called = False
+    signal_called_count = 0
 
     @signals.job_failed.connect
     def check_job(namespace, job, err, **kwargs):
-        nonlocal signal_called
-        signal_called = True
+        nonlocal signal_called_count
+        signal_called_count += 1
         assert job.status == JobStatus.FAILED
 
+    # Signals are sent for both jobs
     assert 0 == broker_2.move_future_jobs()
-    assert True is signal_called
+    assert signal_called_count == 2
 
 
 def test_not_detect_deregistered_broker_as_dead(broker, broker_2):

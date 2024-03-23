@@ -16,7 +16,8 @@ local jobs_json = redis.call('hvals', running_jobs_key)
 
 for _, job_json in ipairs(jobs_json) do
     local job = cjson.decode(job_json)
-    if job["retries"] < job["max_retries"] then
+    -- `max_retries == 0` jobs are non-idempotent, do not re-run them
+    if job["max_retries"] > 0 and job["retries"] < job["max_retries"] then
         job["retries"] = job["retries"] + 1
         -- Set job status to queued:
         -- A major difference between retrying a job failing in a worker and
@@ -41,7 +42,8 @@ for _, job_json in ipairs(jobs_json) do
         redis.call('rpush', queue, job_json)
         num_enqueued_jobs = num_enqueued_jobs + 1
     else
-        -- Keep track of jobs that exceeded the max_retries
+        -- Keep track of jobs that exceeded the max_retries (or were not
+        -- retryable)
         failed_jobs[i] = job_json
         i = i + 1
     end

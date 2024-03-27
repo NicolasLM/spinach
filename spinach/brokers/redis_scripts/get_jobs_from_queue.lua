@@ -33,7 +33,7 @@ repeat
         -- track the running job
         redis.call('hset', running_jobs_key, job["id"], job_json)
         -- If tracking concurrency, bump the current value.
-        if max_concurrency ~= -1 then
+        if max_concurrency ~= nil and max_concurrency ~= -1 then
             redis.call('hincrby', current_concurrency_key, job['task_name'], 1)
         end
 

@@ -187,6 +187,21 @@ def test_cant_exceed_max_concurrency(broker):
     assert json.loads(queued.decode())['id'] == str(job2.id)
 
 
+def test_does_not_set_concurrency_key_when_no_max_concurrency(broker):
+    job = Job(
+        CONCURRENT_TASK_NAME, 'foo_queue', datetime.now(timezone.utc), 1,
+        # kwargs help with debugging but are not part of the test.
+        task_kwargs=dict(name='job'),
+    )
+    broker.enqueue_jobs([job])
+    returned_jobs = broker.get_jobs_from_queue('foo_queue', 2)
+    assert returned_jobs[0].task_kwargs == dict(name='job')
+    current = broker._r.hget(
+        broker._to_namespaced(CURRENT_CONCURRENCY_KEY), CONCURRENT_TASK_NAME
+    )
+    assert current is None
+
+
 def test_get_jobs_from_queue_returns_all_requested(broker):
     # If a job is not returned because it was over concurrency limits,
     # make sure the number of jobs requested is filled from other jobs

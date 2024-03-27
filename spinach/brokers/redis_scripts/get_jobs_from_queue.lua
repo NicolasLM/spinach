@@ -30,13 +30,11 @@ repeat
         job["status"] = job_status_running
         local job_json = cjson.encode(job)
 
-        if job["max_retries"] > 0 then
-            -- job is idempotent, must track if it's running
-            redis.call('hset', running_jobs_key, job["id"], job_json)
-            -- If tracking concurrency, bump the current value.
-            if max_concurrency ~= -1 then
-                redis.call('hincrby', current_concurrency_key, job['task_name'], 1)
-            end
+        -- track the running job
+        redis.call('hset', running_jobs_key, job["id"], job_json)
+        -- If tracking concurrency, bump the current value.
+        if max_concurrency ~= -1 then
+            redis.call('hincrby', current_concurrency_key, job['task_name'], 1)
         end
 
         jobs[i] = job_json

@@ -54,12 +54,12 @@ class Spinach:
                 pass
 
         @signals.job_failed.connect_via(namespace)
-        def job_failed(args, job=None, **kwargs):
+        def job_failed(args, job=None, err=None, **kwargs):
             if not flask.has_app_context():
                 ctx = app.app_context()
                 ctx.push()
                 flask.g.spinach_ctx = ctx
-            self.job_failed(job)
+            self.job_failed(job, err)
 
     @classmethod
     def job_started(cls, *args, job=None, **kwargs):
@@ -82,7 +82,7 @@ class Spinach:
         pass
 
     @classmethod
-    def job_failed(cls, *args, job=None, **kwargs):
+    def job_failed(cls, *args, job=None, err=None, **kwargs):
         """Callback for subclasses to receive job_failed signals.
 
         There's no guarantee of ordering for Signal's callbacks,

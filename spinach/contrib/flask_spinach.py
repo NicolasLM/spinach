@@ -53,6 +53,14 @@ class Spinach:
                 # This means we didn't create the context. Ignore.
                 pass
 
+        @signals.job_failed.connect_via(namespace)
+        def job_failed(args, job=None, **kwargs):
+            if not flask.has_app_context():
+                ctx = app.app_context()
+                ctx.push()
+                flask.g.spinach_ctx = ctx
+            self.job_failed(job)
+
     @classmethod
     def job_started(cls, *args, job=None, **kwargs):
         """Callback for subclasses to receive job_started signals.
@@ -70,6 +78,18 @@ class Spinach:
         There's no guarantee of ordering for Signal's callbacks,
         so use this callback instead to make sure the app context
         was pushed.
+        """
+        pass
+
+    @classmethod
+    def job_failed(cls, *args, job=None, **kwargs):
+        """Callback for subclasses to receive job_failed signals.
+
+        There's no guarantee of ordering for Signal's callbacks,
+        so use this callback instead to make sure the app context
+        was pushed. If the signal is called as part of dead broker
+        detection, you will need to use this as normal signals may
+        not have been called with the app context pushed.
         """
         pass
 

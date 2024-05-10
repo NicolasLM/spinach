@@ -226,15 +226,13 @@ class RedisBroker(Broker):
         return jobs
 
     def remove_job_from_running(self, job: Job):
-        if job.max_retries > 0:
-            self._run_script(
-                self._remove_job_from_running,
-                self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
-                self._to_namespaced(MAX_CONCURRENCY_KEY),
-                self._to_namespaced(CURRENT_CONCURRENCY_KEY),
-                job.serialize(),
-            )
-
+        self._run_script(
+            self._remove_job_from_running,
+            self._to_namespaced(RUNNING_JOBS_KEY.format(self._id)),
+            self._to_namespaced(MAX_CONCURRENCY_KEY),
+            self._to_namespaced(CURRENT_CONCURRENCY_KEY),
+            job.serialize(),
+        )
         self._something_happened.set()
 
     def _subscriber_func(self):

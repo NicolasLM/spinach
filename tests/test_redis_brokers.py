@@ -86,6 +86,7 @@ def test_running_job(broker):
     )
     # Try to remove it, even if it doesn't exist in running
     broker.remove_job_from_running(job)
+    assert broker._r.hget(running_jobs_key, str(job.id)) is None
 
     # Idempotent job - get from queue
     job = Job('foo_task', 'foo_queue', datetime.now(timezone.utc), 10)

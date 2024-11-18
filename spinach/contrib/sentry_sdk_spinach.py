@@ -1,5 +1,5 @@
-from sentry_sdk.hub import Hub
 from sentry_sdk.integrations import Integration
+from sentry_sdk.scope import Scope, ScopeType
 
 from spinach import signals
 
@@ -28,18 +28,20 @@ class SpinachIntegration(Integration):
 
 
 def _job_started(namespace, job, **kwargs):
-    hub = Hub.current
 
-    # Scopes are for error reporting
-    hub.push_scope()
-    with hub.configure_scope() as scope:
-        scope.transaction = job.task_name
-        scope.clear_breadcrumbs()
-        for attr in job.__slots__:
-            scope.set_extra(attr, getattr(job, attr))
+    current_scope = Scope(ty=ScopeType.CURRENT)
+    Scope.set_current_scope(current_scope)
+
+    isolation_scope = Scope(ty=ScopeType.ISOLATION)
+    Scope.set_isolation_scope(isolation_scope)
+
+    isolation_scope.transaction = job.task_name
+    isolation_scope.clear_breadcrumbs()
+    for attr in job.__slots__:
+        isolation_scope.set_extra(attr, getattr(job, attr))
 
     # Transactions and spans are for tracing
-    transaction = hub.start_transaction(
+    transaction = isolation_scope.start_transaction(
         op='task',
         name=job.task_name
     )
@@ -50,31 +52,32 @@ def _job_started(namespace, job, **kwargs):
 
 
 def _job_finished(namespace, job, **kwargs):
-    hub = Hub.current
-    with hub.configure_scope() as scope:
-        for attr in job.__slots__:
-            scope.set_extra(attr, getattr(job, attr))
-    hub.scope.transaction.__exit__(None, None, None)
-    hub.pop_scope_unsafe()
+    isolation_scope = Scope.get_isolation_scope()
+    for attr in job.__slots__:
+        isolation_scope.set_extra(attr, getattr(job, attr))
+    transaction = isolation_scope.transaction
+    if transaction is not None:
+        transaction.__exit__(None, None, None)
+    Scope.set_current_scope(None)
+    Scope.set_isolation_scope(None)
 
 
 def _job_failed(namespace, job, **kwargs):
-    hub = Hub.current
-    with hub.configure_scope() as scope:
-        for attr in job.__slots__:
-            scope.set_extra(attr, getattr(job, attr))
-    hub.capture_exception()
-    hub.scope.transaction.set_status("internal_error")
+    scope = Scope.get_isolation_scope()
+    for attr in job.__slots__:
+        scope.set_extra(attr, getattr(job, attr))
+    scope.capture_exception()
+    if scope.transaction is not None:
+        scope.transaction.set_status("internal_error")
 
 
 def _job_schedule_retry(namespace, job, **kwargs):
-    hub = Hub.current
-    with hub.configure_scope() as scope:
-        for attr in job.__slots__:
-            scope.set_extra(attr, getattr(job, attr))
-    integration = hub.get_integration(SpinachIntegration)
+    scope = Scope.get_isolation_scope()
+    for attr in job.__slots__:
+        scope.set_extra(attr, getattr(job, attr))
+    integration = scope.get_client().get_integration(SpinachIntegration)
     if integration is None:
         return
 
     if integration.send_retries:
-        hub.capture_exception()
+        scope.capture_exception()

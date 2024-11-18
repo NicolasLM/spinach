@@ -6,7 +6,7 @@ Installation
 Prerequisites
 -------------
 
-Spinach is written in Python 3, prior to use it you must make sure you have a Python 3.6+
+Spinach is written in Python 3, prior to use it you must make sure you have a Python 3.8+
 interpreter on your system.
 
 Pip

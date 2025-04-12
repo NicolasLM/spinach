@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from logging import getLogger
@@ -183,6 +184,11 @@ class Broker(ABC):
         rv = self._broker_info.copy()
         rv['last_seen_at'] = int(time.time())
         return rv
+
+    @classmethod
+    def start_at(cls) -> datetime:
+        now = math.ceil(datetime.now(timezone.utc).timestamp())
+        return datetime.fromtimestamp(now, tz=timezone.utc)
 
     def __repr__(self):
         return '<{}: {}>'.format(self.__class__.__name__, self._id)

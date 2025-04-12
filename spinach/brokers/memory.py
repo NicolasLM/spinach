@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from logging import getLogger
 from queue import Queue, Empty
 import sched
@@ -96,7 +95,7 @@ class MemoryBroker(Broker):
             )
 
     def _schedule_periodic_task(self, task: Task):
-        at = datetime.now(timezone.utc)
+        at = self.start_at()
         job = Job(task.name, task.queue, at, task.max_retries)
         self.enqueue_jobs([job])
         self._scheduler.enter(

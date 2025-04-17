@@ -88,7 +88,7 @@ class MemoryBroker(Broker):
         """Register tasks that need to be scheduled periodically."""
         for task in tasks:
             self._scheduler.enter(
-                int(task.periodicity.total_seconds()),
+                int(task.periodicity.total_seconds()) + task.periodicity_start,
                 0,
                 self._schedule_periodic_task,
                 argument=(task,)

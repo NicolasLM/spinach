@@ -124,8 +124,8 @@ class ThreadWorkers(BaseWorkers):
                 advance_job_status(self._namespace, job, duration, None)
             finally:
                 signals.job_finished.send(self._namespace, job=job)
-                self.out_queue.put(job)
                 self._in_queue.task_done()
+                self.out_queue.put(job)
 
         logger.debug('Worker %s terminated', worker_name)
         signals.worker_terminated.send(self._namespace,
@@ -200,5 +200,5 @@ class AsyncioWorkers(BaseWorkers):
                 advance_job_status(self._namespace, job, duration, None)
             finally:
                 signals.job_finished.send(self._namespace, job=job)
-                self.out_queue.put(job)
                 self._in_queue.task_done()
+                self.out_queue.put(job)

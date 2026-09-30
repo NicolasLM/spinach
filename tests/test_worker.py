@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from queue import Queue
 from unittest.mock import Mock, ANY
 import time
 import sys
@@ -134,3 +135,25 @@ def test_can_accept_job(workers, job):
 
     wait_for_queue_empty(workers)
     assert workers.available_slots == 2
+
+
+@pytest.mark.parametrize('workers_class', workers_to_test)
+def test_slot_is_free_once_job_is_reported(workers_class, job, monkeypatch):
+    workers = workers_class(1, 'tests')
+    try:
+        workers.out_queue = Queue()
+        job, _ = job
+        reported_available_slots = []
+        put = workers.out_queue.put
+
+        def report(item):
+            if item is job:
+                reported_available_slots.append(workers.available_slots)
+            put(item)
+
+        monkeypatch.setattr(workers.out_queue, 'put', report)
+        workers.submit_job(job)
+        assert workers.out_queue.get(timeout=10) is job
+        assert reported_available_slots == [1]
+    finally:
+        workers.stop()

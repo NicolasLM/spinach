@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from logging import getLogger
 import threading
@@ -121,7 +122,7 @@ class Engine:
                   task_kwargs=kwargs)
         job.task_func = task.func
         job.check_signature()
-        self._broker.enqueue_jobs([job])
+        self._dispatch_jobs([job])
         return job
 
     def schedule_batch(self, batch: Batch) -> Iterable[Job]:
@@ -145,8 +146,39 @@ class Engine:
             job.check_signature()
             jobs.append(job)
 
-        self._broker.enqueue_jobs(jobs)
+        self._dispatch_jobs(jobs)
         return jobs
+
+    def _dispatch_jobs(self, jobs):
+        """Enqueue jobs, joining a caller transaction when one is active."""
+        broker = self._broker
+        if getattr(type(broker), 'supports_join_transaction', False):
+            connection = broker.joined_connection()
+            if connection is not None:
+                broker.enqueue_in_transaction(jobs, connection)
+                return
+        broker.enqueue_jobs(jobs)
+
+    @contextmanager
+    def join_transaction(self, connection):
+        """Schedule jobs on the caller's open transaction.
+
+        ``schedule``, ``schedule_at``, and ``schedule_batch`` inside
+        the block insert their jobs through the broker and do not
+        commit ``connection``. The caller commits or rolls the
+        transaction back. A broker that does not support this raises
+        ``RuntimeError``.
+
+        Task keyword arguments are unchanged. A task parameter named
+        ``connection`` is still passed to the task.
+        """
+        broker = self._broker
+        if not getattr(type(broker), 'supports_join_transaction', False):
+            raise RuntimeError(
+                'broker does not support join_transaction'
+            )
+        with broker.join_transaction(connection):
+            yield
 
     def _arbiter_func(self, stop_when_queue_empty=False):
         logger.debug('Arbiter started')

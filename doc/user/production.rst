@@ -35,6 +35,12 @@ but would evict keys when running low on memory.
 Finally standard security practices apply: Redis should not accept connections from the Internet
 and it should require a password even when connecting locally.
 
+Postgres
+--------
+
+PostgresBroker keeps jobs in Postgres and can commit a job with the
+application's own rows. Roles, schema, and TLS are in :ref:`postgres`.
+
 System
 ------
 
@@ -71,7 +77,7 @@ Spinach:
 - Different queues are used if tasks have different usage pattens, see
   :doc:`queues`
 - Different namespaces are used if multiple Spinach applications share the same
-  Redis server, see :doc:`engine`
+  Redis server or Postgres database, see :doc:`engine`
 
 Redis:
 
@@ -80,6 +86,15 @@ Redis:
 - The Redis server used by Spinach is not also used as a cache
 - Connections are secured by a long password
 - Connections are encrypted if they go through the public Internet
+
+Postgres:
+
+- The connection string comes from the environment, uses SCRAM-SHA-256, and
+  sets ``sslmode=verify-full``
+- ``require_ssl`` is ``True``, so a session whose ``sslmode`` is not
+  ``verify-full`` is rejected
+- A migration role applies the schema. Workers do not own the tables
+- Co-committed jobs and application rows share one database
 
 System:
 

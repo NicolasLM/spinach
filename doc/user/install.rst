@@ -19,6 +19,12 @@ with::
 
 That's it, you can call it a day!
 
+The Postgres broker is the ``postgres`` extra::
+
+    $ pip install spinach[postgres]
+
+Pass the connection string from the environment.
+
 From Source
 -----------
 

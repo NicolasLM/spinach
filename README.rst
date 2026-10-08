@@ -10,7 +10,7 @@ Spinach
 .. image:: https://img.shields.io/badge/IRC-irc.libera.chat-1e72ff.svg?style=flat
     :target: https://kiwiirc.com/nextclient/irc.libera.chat:+6697/#spinach
 
-Redis task queue for Python 3 heavily inspired by Celery and RQ.
+Task queue for Python 3 heavily inspired by Celery and RQ.
 
 Distinctive features:
 

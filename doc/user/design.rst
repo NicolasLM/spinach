@@ -86,15 +86,17 @@ redeploys and move containers around.
 All Spinach workers are part of the system that schedules periodic jobs, there is no need to have
 a pet in the cattle farm.
 
-Only two brokers
-----------------
+Brokers
+-------
 
-Spinach lets the user pick between the in-memory broker for local development and the Redis broker
-for production. Both support exactly the same set of features.
+MemoryBroker is for local development and tests.
 
-Redis was chosen because it is an incredibly versatile database. With Lua scripting it becomes
-possible to develop entirely new patterns which are essential to create a useful and reliable task
-queue.
+RedisBroker uses Lua so a queue, a future schedule, running jobs, and concurrency counters change
+in one operation.
+
+:ref:`PostgresBroker <postgres>` stores the queue, the future schedule, running jobs, and
+concurrency counters in Postgres. One SQL transaction updates them. The job row can be part of the
+application's own transaction.
 
 Other services like Google PubSub, Amazon SQS or AMQP are very opinionated and not as versatile as
 Redis, making them difficult to use within Spinach without cutting down on features.
@@ -102,8 +104,8 @@ Redis, making them difficult to use within Spinach without cutting down on featu
 Namespace
 ---------
 
-Multiple Spinach applications (production, staging...) can use the same Redis database without
-interfering with each other.
+Multiple Spinach applications (production, staging...) can use the same Redis or Postgres
+database without interfering with each other.
 
 Likewise, a single interpreter can run multiple Spinach applications without them interfering with
 each other.

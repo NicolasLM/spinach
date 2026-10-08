@@ -58,9 +58,19 @@ setup(
             'flask',
             'django'
         ],
+        # psycopg 3.3 requires Python 3.10. Older interpreters keep 3.2.
+        'postgres': [
+            'psycopg[binary]>=3.1,<3.3; python_version < "3.10"',
+            'psycopg[binary]>=3.1; python_version >= "3.10"',
+            'psycopg_pool>=3.1,<3.3; python_version < "3.10"',
+            'psycopg_pool>=3.1; python_version >= "3.10"',
+        ],
     },
 
     package_data={
+        'spinach.brokers': [
+            'postgres_schema.sql',
+        ],
         'spinach.brokers.redis_scripts': [
             'deregister.lua',
             'enqueue_job.lua',

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import os
 from unittest.mock import patch
 import uuid
 
@@ -12,7 +13,25 @@ from spinach.task import Task
 from .conftest import get_now, set_now
 
 
-@pytest.fixture(params=[MemoryBroker, RedisBroker])
+def _postgres_broker():
+    from spinach.brokers.postgres import PostgresBroker
+    return PostgresBroker(
+        os.environ['SPINACH_TEST_POSTGRES_DSN'],
+        require_ssl=False,
+    )
+
+
+def _broker_params():
+    params = [
+        pytest.param(MemoryBroker, id='memory'),
+        pytest.param(RedisBroker, id='redis'),
+    ]
+    if os.environ.get('SPINACH_TEST_POSTGRES_DSN'):
+        params.append(pytest.param(_postgres_broker, id='postgres'))
+    return params
+
+
+@pytest.fixture(params=_broker_params())
 def broker(request):
     broker = request.param()
     broker.namespace = 'tests'
@@ -22,6 +41,9 @@ def broker(request):
     yield broker
     broker.stop()
     broker.flush()
+    close = getattr(type(broker), 'close', None)
+    if close is not None:
+        close(broker)
 
 
 def test_normal_job(broker):

@@ -3,8 +3,7 @@ from unittest.mock import Mock, ANY, patch
 
 import pytest
 
-from spinach import Engine, MemoryBroker, Batch, Tasks
-from spinach.brokers.redis import RedisBroker
+from spinach import Engine, MemoryBroker, RedisBroker, Batch, Tasks
 from spinach.exc import UnknownTask
 
 from .conftest import get_now

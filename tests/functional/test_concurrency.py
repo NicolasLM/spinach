@@ -36,9 +36,8 @@ def spin(request):
         if engine._workers is not None:
             engine.stop_workers()
         broker.flush()
-        close = getattr(broker, 'close', None)
-        if close is not None:
-            close()
+        if hasattr(broker, 'close'):
+            broker.close()
 
 
 def test_concurrency_limit(spin):

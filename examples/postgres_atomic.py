@@ -1,11 +1,12 @@
-"""Co-commit an application row and a Spinach job.
+"""Co-commit an order row and a Spinach job.
 
-The DSN is read from the environment. Nothing in this example embeds a
-password. Install the extra with ``pip install spinach[postgres]`` and
-point SPINACH_POSTGRES_DSN at the database, using SCRAM-SHA-256 and
-``sslmode=verify-full`` outside of local development.
-``require_ssl`` defaults to True. This sample turns it off for a
-local server that has no TLS.
+Install the extra and point the process at the database::
+
+    pip install spinach[postgres]
+    export SPINACH_POSTGRES_DSN=postgresql://localhost/spinach
+
+``require_ssl`` is False here because this sample targets a local server
+without TLS.
 """
 import os
 

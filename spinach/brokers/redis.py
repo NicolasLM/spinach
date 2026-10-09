@@ -14,7 +14,7 @@ try:  # Redis < 4.1.0
 except ImportError:  # Redis >= 4.1.0
     from redis.commands.core import Script
 
-from ..brokers.base import Broker
+from ..brokers.base import Broker, generate_idempotency_token
 from ..job import Job, JobStatus, advance_job_status
 from ..task import Task
 from ..const import (
@@ -367,10 +367,6 @@ class RedisBroker(Broker):
             return 0
 
         return next_event_time - now
-
-
-def generate_idempotency_token():
-    return str(uuid.uuid4())
 
 
 recommended_socket_opts = {

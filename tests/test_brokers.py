@@ -41,9 +41,8 @@ def broker(request):
     yield broker
     broker.stop()
     broker.flush()
-    close = getattr(type(broker), 'close', None)
-    if close is not None:
-        close(broker)
+    if hasattr(broker, 'close'):
+        broker.close()
 
 
 def test_normal_job(broker):

@@ -114,27 +114,24 @@ and ``USAGE`` on ``spinach_queue_job_position_seq``. An application role
 that only dispatches jobs needs ``INSERT`` on ``spinach_queue_job`` and
 ``spinach_future_job``, plus ``USAGE`` on that sequence.
 
-Production connections use a password and SCRAM-SHA-256. Set
-``password_encryption = scram-sha-256`` on the server. Do not enable MD5
-password authentication. ``require_ssl`` defaults to True. The session
-must use TLS with ``sslmode=verify-full``, including a connection passed
-to ``join_transaction``. An encrypted session that does not verify the
-server certificate is rejected. Set ``require_ssl`` to False only for a
-local server that has no TLS. Put ``sslmode=verify-full`` and
-``sslrootcert`` in the DSN. The CA file comes from the environment. Do
-not embed certificate data in Python source.
+Production:
 
-Before trusting the server certificate, inspect it::
-
-    openssl x509 -text -noout -in server.crt
-
-It must be inside its validity dates, use at least an RSA 2048-bit key or
-an ECDSA P-256 key, and be signed with SHA-256 or stronger. A self-signed
-certificate is only for local tests where trust is configured on purpose.
-
-Do not accept Postgres connections from the internet. Keep server clocks
-synchronized with ntp, because scheduling uses the system clock. Start
-workers from an init system that restarts them after a crash or a reboot.
+- Use a password and SCRAM-SHA-256. Set ``password_encryption =
+  scram-sha-256``. Leave MD5 password authentication disabled.
+- Put ``sslmode=verify-full`` and ``sslrootcert`` in the DSN. The CA file
+  comes from the environment. Do not embed certificate data in Python
+  source. ``require_ssl`` defaults to True and rejects any other mode,
+  including a connection passed to ``join_transaction``. Set it to False
+  only for a local server that has no TLS.
+- Before trusting the server certificate, run ``openssl x509 -text
+  -noout``. It must be currently valid, use at least an RSA 2048-bit key
+  or an ECDSA P-256 key, and be signed with SHA-256 or stronger. A
+  self-signed certificate is only for local tests.
+- Do not accept Postgres connections from the internet.
+- Keep server clocks synchronized with ntp. Scheduling uses the system
+  clock.
+- Start workers under an init system that restarts them after a crash or
+  a reboot.
 
 Control
 -------

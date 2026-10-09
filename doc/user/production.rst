@@ -90,11 +90,12 @@ Redis:
 Postgres:
 
 - The connection string comes from the environment, uses SCRAM-SHA-256, and
-  sets ``sslmode=verify-full``
-- ``require_ssl`` is ``True``, so a session whose ``sslmode`` is not
-  ``verify-full`` is rejected
+  sets sslmode=verify-full
+- require_ssl is True, so a session whose sslmode is not verify-full is
+  rejected
 - A migration role applies the schema. Workers do not own the tables
-- Co-committed jobs and application rows share one database
+- Spinach tables and the application tables written in the same transaction
+  live in one database
 
 System:
 

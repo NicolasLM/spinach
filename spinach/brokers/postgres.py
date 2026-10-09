@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover
     psycopg = None
     ConnectionPool = None
 
-from ..brokers.base import Broker
+from ..brokers.base import Broker, generate_idempotency_token
 from ..const import DEFAULT_ENQUEUE_JOB_RETRIES
 from ..job import Job, JobStatus, advance_job_status
 from ..task import Task
@@ -131,10 +131,6 @@ _FLUSH_SQL = (
 # Value is (id(broker), connection). A new thread starts empty, so the
 # arbiter and the result notifier do not inherit a request transaction.
 _joined = contextvars.ContextVar('spinach_pg_joined', default=None)
-
-
-def generate_idempotency_token():
-    return str(uuid.uuid4())
 
 
 def _schema_statements():
@@ -359,15 +355,12 @@ class PostgresBroker(Broker):
     """Postgres-backed broker.
 
     :arg dsn: libpq connection string. Required. Read it from the
-        environment or a secrets manager. There is no default.
+        environment or a secrets manager.
     :arg enqueue_job_max_retries: retries for a dropped pooled enqueue.
     :arg ensure_schema: create tables on startup when True.
-    :arg require_ssl: reject a session unless it uses TLS with
-        ``sslmode=verify-full``. The default is True. ``sslmode=require``
-        encrypts the session and still fails this check, because the
-        server certificate was not verified. Set this to False only for
-        a local server that has no TLS. Confirm the server certificate
-        with ``openssl x509 -text -noout`` before trusting it.
+    :arg require_ssl: when True (the default), require TLS with
+        ``sslmode=verify-full``. Set this to False only for a local
+        server that has no TLS.
 
     ``close()`` releases the connection pool. ``stop()`` leaves the pool
     open so ``flush()`` can still run.

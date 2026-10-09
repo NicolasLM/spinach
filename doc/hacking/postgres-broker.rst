@@ -351,18 +351,9 @@ Row locks keep concurrent callers from appending the same job twice.
 Tests
 -----
 
-``tests/test_brokers.py`` includes ``PostgresBroker`` when
-``SPINACH_TEST_POSTGRES_DSN`` is set. ``tests/test_postgres_brokers.py``
-covers commit and rollback visibility, TLS rejection, namespace flush,
-concurrency, idempotency, dead-broker re-queue, and ``stop``. The module
-is skipped when psycopg is missing or the DSN is unset.
-
-``tests/conftest.py`` patches ``spinach.brokers.postgres.datetime`` so
-future-job tests use the patched clock.
-
-The test DSN has no password. CI and ``tests/docker-compose.yml`` run
-Postgres 16 with trust authentication on the local network. Production
-connections use SCRAM-SHA-256 and ``sslmode=verify-full``.
+Postgres tests run when ``SPINACH_TEST_POSTGRES_DSN`` is set. CI and
+``tests/docker-compose.yml`` run Postgres 16 with trust authentication.
+Production connections use SCRAM-SHA-256 and ``sslmode=verify-full``.
 
 Security
 --------

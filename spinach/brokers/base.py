@@ -14,6 +14,10 @@ from ..const import WAIT_FOR_EVENT_MAX_SECONDS
 logger = getLogger('spinach.broker')
 
 
+def generate_idempotency_token():
+    return str(uuid.uuid4())
+
+
 class Broker(ABC):
     # Opt in when enqueue can run inside the caller's transaction.
     # Implement join_transaction, joined_connection, and

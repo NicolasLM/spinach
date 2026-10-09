@@ -839,29 +839,36 @@ class PostgresBroker(Broker):
     def register_periodic_tasks(self, tasks: Iterable[Task]):
         tasks = list(tasks)
         self._number_periodic_tasks = len(tasks)
-        now_score = int(math.ceil(
-            datetime.now(timezone.utc).timestamp()
-        ))
+        now_score = int(self.start_at().timestamp())
         with self._transaction() as conn:
             rows = conn.execute(
-                'SELECT name, periodicity_seconds '
+                'SELECT name, periodicity_seconds, payload '
                 'FROM spinach_periodic_task '
                 'WHERE namespace = %s ORDER BY name FOR UPDATE',
                 (self.namespace,),
             ).fetchall()
-            existing = {name: period for name, period in rows}
+            existing = {}
+            for name, period, payload in rows:
+                stored = json.loads(payload)
+                existing[name] = (
+                    int(period),
+                    int(stored.get('periodicity_start') or 0),
+                )
             seen = set()
             for task in tasks:
                 payload = task.serialize()
-                period = json.loads(payload)['periodicity']
+                data = json.loads(payload)
+                period = data['periodicity']
                 if period is None:
                     raise ValueError(
                         'periodic task %s has no periodicity' % task.name
                     )
                 period = int(period)
+                start = int(data.get('periodicity_start') or 0)
                 seen.add(task.name)
-                next_at = _score_time(now_score + period)
-                if task.name not in existing:
+                previous = existing.get(task.name)
+                if previous is None:
+                    next_at = _score_time(now_score + period + start)
                     conn.execute(
                         'INSERT INTO spinach_periodic_task ('
                         'namespace, name, periodicity_seconds, next_at, '
@@ -869,7 +876,17 @@ class PostgresBroker(Broker):
                         (self.namespace, task.name, period, next_at,
                          payload),
                     )
-                elif int(existing[task.name]) != period:
+                elif previous[1] != start:
+                    next_at = _score_time(now_score + period + start)
+                    conn.execute(
+                        'UPDATE spinach_periodic_task '
+                        'SET periodicity_seconds = %s, next_at = %s, '
+                        'payload = %s WHERE namespace = %s AND name = %s',
+                        (period, next_at, payload, self.namespace,
+                         task.name),
+                    )
+                elif previous[0] != period:
+                    next_at = _score_time(now_score + period)
                     conn.execute(
                         'UPDATE spinach_periodic_task '
                         'SET periodicity_seconds = %s, next_at = %s, '

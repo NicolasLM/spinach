@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from logging import getLogger
 from queue import Queue, Empty
 import sched
@@ -89,14 +88,14 @@ class MemoryBroker(Broker):
         """Register tasks that need to be scheduled periodically."""
         for task in tasks:
             self._scheduler.enter(
-                int(task.periodicity.total_seconds()),
+                int(task.periodicity.total_seconds()) + task.periodicity_start,
                 0,
                 self._schedule_periodic_task,
                 argument=(task,)
             )
 
     def _schedule_periodic_task(self, task: Task):
-        at = datetime.now(timezone.utc)
+        at = self.start_at()
         job = Job(task.name, task.queue, at, task.max_retries)
         self.enqueue_jobs([job])
         self._scheduler.enter(

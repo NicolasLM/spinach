@@ -1,7 +1,5 @@
-from datetime import datetime, timezone
 import json
 from logging import getLogger
-import math
 from os import path
 import socket
 import threading
@@ -150,7 +148,7 @@ class RedisBroker(Broker):
             self.namespace,
             self._to_namespaced(FUTURE_JOBS_KEY),
             self._to_namespaced(NOTIFICATIONS_KEY),
-            math.ceil(datetime.now(timezone.utc).timestamp()),
+            self.start_at().timestamp(),
             JobStatus.QUEUED.value,
             self._to_namespaced(PERIODIC_TASKS_HASH_KEY),
             self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
@@ -316,7 +314,7 @@ class RedisBroker(Broker):
         self._number_periodic_tasks = len(_tasks)
         self._run_script(
             self._register_periodic_tasks,
-            math.ceil(datetime.now(timezone.utc).timestamp()),
+            self.start_at().timestamp(),
             self._to_namespaced(PERIODIC_TASKS_HASH_KEY),
             self._to_namespaced(PERIODIC_TASKS_QUEUE_KEY),
             *_tasks
@@ -361,7 +359,7 @@ class RedisBroker(Broker):
         if not rv:
             return None
 
-        now = datetime.now(timezone.utc).timestamp()
+        now = self.start_at()
         next_event_time = rv[0][1]
         if next_event_time < now:
             return 0

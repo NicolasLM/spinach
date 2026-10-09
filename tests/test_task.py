@@ -39,9 +39,9 @@ def test_task_eq(task):
 
 def test_task_repr(task):
     task_repr = repr(task)
-    expected = 'Task({}, {}, {}, {}, {}, {})'.format(
+    expected = 'Task({}, {}, {}, {}, {}, {}, {})'.format(
         task.func, task.name, task.queue, task.max_retries,
-        task.periodicity, task.max_concurrency,
+        task.periodicity, task.periodicity_start, task.max_concurrency,
     )
     assert task_repr == expected
 
@@ -67,16 +67,16 @@ def test_tasks_add(task):
 def test_task_serialize(task):
     expected = (
         '{"max_concurrency": -1, "max_retries": 0, '
-        '"name": "write_to_stdout", '
-        '"periodicity": null, "queue": "foo_queue"}'
+        '"name": "write_to_stdout", "periodicity": null, '
+        '"periodicity_start": 0, "queue": "foo_queue"}'
     )
     assert task.serialize() == expected
 
     task.periodicity = timedelta(minutes=5)
     expected = (
         '{"max_concurrency": -1, "max_retries": 0, '
-        '"name": "write_to_stdout", '
-        '"periodicity": 300, "queue": "foo_queue"}'
+        '"name": "write_to_stdout", "periodicity": 300, '
+        '"periodicity_start": 0, "queue": "foo_queue"}'
     )
     assert task.serialize() == expected
 

@@ -432,16 +432,16 @@ def test_old_periodic_tasks(broker):
     assert broker._number_periodic_tasks == 2
     assert broker._r.hgetall(periodic_tasks_hash_key) == {
         b'foo': b'{"max_concurrency": -1, "max_retries": 0, "name": "foo", '
-                b'"periodicity": 5, "queue": "q1"}',
+                b'"periodicity": 5, "periodicity_start": 0, "queue": "q1"}',
         b'bar': b'{"max_concurrency": -1, "max_retries": 0, "name": "bar", '
-                b'"periodicity": 10, "queue": "q1"}'
+                b'"periodicity": 10, "periodicity_start": 0, "queue": "q1"}'
     }
 
     broker.register_periodic_tasks([tasks[1]])
     assert broker._number_periodic_tasks == 1
     assert broker._r.hgetall(periodic_tasks_hash_key) == {
         b'bar': b'{"max_concurrency": -1, "max_retries": 0, "name": "bar", '
-                b'"periodicity": 10, "queue": "q1"}'
+                b'"periodicity": 10, "periodicity_start": 0, "queue": "q1"}'
     }
 
 
@@ -455,3 +455,17 @@ def test_idempotency_token(_, broker):
     jobs = broker.get_jobs_from_queue('foo_queue', max_jobs=10)
     job_1.status = JobStatus.RUNNING
     assert jobs == [job_1]
+
+
+def test_periodic_tasks_changing_snap_value_reschedules(broker, patch_now):
+    tasks = [Task(print, 'foo', 'q1', 0, timedelta(hours=1))]
+    broker.register_periodic_tasks(tasks)
+    old = broker.inspect_periodic_tasks()
+    tasks = [
+        Task(print, 'foo', 'q1', 0, timedelta(hours=1), timedelta(minutes=15))
+    ]
+    broker.register_periodic_tasks(tasks)
+    new = broker.inspect_periodic_tasks()
+    # Ensure that the task is "the same", but the scheduled time has moved
+    assert old[0][1] == new[0][1]
+    assert (old[0][0] + tasks[0].periodicity_start) == new[0][0]

@@ -158,3 +158,64 @@ def test_periodic_tasks(broker):
     assert r[0][1] == 'foo'
     assert r[1][1] == 'bar'
     assert r[0][0] == r[1][0] - 5
+
+
+@pytest.fixture(params=tuple(range(1, 12)))
+def periodicity(request):
+    value = request.param
+    yield value
+
+
+def test_periodic_tasks_with_snap_values(broker, patch_now, periodicity):
+    set_now(datetime(2025, 4, 15, 0, 26, 21, 193337))
+    next_p = periodicity * 2
+    tasks = [
+        Task(print, 'foo', 'q1', 0, timedelta(hours=periodicity),
+             timedelta(minutes=15)),
+        Task(print, 'bar', 'q1', 0, timedelta(hours=next_p),
+             timedelta(minutes=15, seconds=5)),
+    ]
+    broker.register_periodic_tasks(tasks)
+    r = broker.inspect_periodic_tasks()
+    assert r[0][1] == 'foo'
+    assert r[1][1] == 'bar'
+    assert r[0][0] == r[1][0] - (3600 * periodicity) - 5
+
+
+def test_periodic_tasks_with_snap_values_roll(broker, patch_now, periodicity):
+    set_now(datetime(2025, 4, 17, 23, 51, 21, 288362))
+    next_p = periodicity * 2
+    tasks = [
+        Task(print, 'foo', 'q1', 0, timedelta(hours=periodicity),
+             timedelta(minutes=15)),
+        Task(print, 'bar', 'q1', 0, timedelta(hours=next_p),
+             timedelta(minutes=15, seconds=5)),
+    ]
+    broker.register_periodic_tasks(tasks)
+    r = broker.inspect_periodic_tasks()
+    assert r[0][1] == 'foo'
+    assert r[1][1] == 'bar'
+    assert r[0][0] == r[1][0] - (3600 * periodicity) - 5
+
+
+def test_periodic_tasks_with_snap_zero_is_noop(broker):
+    tasks = [
+        Task(print, 'foo', 'q1', 0, timedelta(seconds=5), timedelta(0)),
+        Task(print, 'bar', 'q1', 0, timedelta(seconds=10), timedelta(0))
+    ]
+    broker.register_periodic_tasks(tasks)
+
+    r = broker.inspect_periodic_tasks()
+    assert r[0][1] == 'foo'
+    assert r[1][1] == 'bar'
+    assert r[0][0] == r[1][0] - 5
+
+
+def test_periodic_tasks_with_snap_seconds_invalid_values():
+    with pytest.raises(ValueError, match="periodicity must be set"):
+        Task(print, 'foo', 'q1', 0, None, timedelta(minutes=15))
+    with pytest.raises(ValueError, match="must be < periodicity"):
+        Task(print, 'foo', 'q1', 0, timedelta(minutes=5),
+             timedelta(minutes=15))
+    with pytest.raises(ValueError, match="must be <= 12 hours"):
+        Task(print, 'foo', 'q1', 0, timedelta(hours=13), timedelta(hours=13))

@@ -132,3 +132,7 @@ class Spinach:
     @property
     def schedule_batch(self):
         return self.spin.schedule_batch
+
+    @property
+    def join_transaction(self):
+        return self.spin.join_transaction

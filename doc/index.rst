@@ -3,7 +3,7 @@ Spinach
 
 Release v\ |version|. (:ref:`Installation <install>`)
 
-Spinach is a Redis task queue for Python 3 heavily inspired by Celery and RQ.
+Spinach is a task queue for Python 3 heavily inspired by Celery and RQ.
 
 Distinctive features:
 
@@ -29,7 +29,7 @@ The :class:`Engine` is the central part of Spinach, it allows to define tasks, s
 execute in the background and start background workers. :ref:`More details <engine>`.
 
 The Broker is the backend that background workers use to retrieve jobs to execute. Spinach provides
-two brokers: MemoryBroker for development and RedisBroker for production.
+MemoryBroker for development, RedisBroker, and :ref:`PostgresBroker <postgres>`.
 
 The :meth:`Engine.task` decorator is used to register tasks. It requires at least a `name` to
 identify the task, but other options can be given to customize how the task behaves. :ref:`More
@@ -49,6 +49,7 @@ Getting started with spinach:
     user/tasks
     user/jobs
     user/engine
+    user/postgres
     user/queues
     user/asyncio
     user/integrations
@@ -64,3 +65,4 @@ Hacking guide:
 
     hacking/contributing
     hacking/internals
+    hacking/postgres-broker

@@ -1,8 +1,9 @@
+from contextlib import contextmanager
 from unittest.mock import Mock, ANY, patch
 
 import pytest
 
-from spinach import Engine, MemoryBroker, Batch, Tasks
+from spinach import Engine, MemoryBroker, RedisBroker, Batch, Tasks
 from spinach.exc import UnknownTask
 
 from .conftest import get_now
@@ -134,6 +135,68 @@ def test_execute(spin):
 def test_start_workers_twice(spin):
     with pytest.raises(RuntimeError):
         spin.start_workers()
+
+
+class _JoinedBroker:
+    supports_join_transaction = True
+
+    def __init__(self):
+        self.namespace = None
+        self.enqueued = []
+        self.tx_enqueued = []
+        self._connection = None
+
+    @contextmanager
+    def join_transaction(self, connection):
+        self._connection = connection
+        try:
+            yield
+        finally:
+            self._connection = None
+
+    def joined_connection(self):
+        return self._connection
+
+    def enqueue_jobs(self, jobs, from_failure=False):
+        self.enqueued.extend(jobs)
+
+    def enqueue_in_transaction(self, jobs, connection):
+        self.tx_enqueued.append((connection, list(jobs)))
+
+
+@pytest.mark.parametrize('broker_cls', [MemoryBroker, RedisBroker])
+def test_join_transaction_rejected(broker_cls):
+    spin = Engine(broker_cls(), namespace='tests')
+    with pytest.raises(
+            RuntimeError, match='does not support join_transaction'):
+        with spin.join_transaction(object()):
+            pass
+
+
+def test_schedule_joins_caller_transaction():
+    broker = _JoinedBroker()
+    spin = Engine(broker, namespace='tests')
+    tasks = Tasks()
+
+    def record(connection):
+        pass
+
+    tasks.add(record, 'record')
+    spin.attach_tasks(tasks)
+    connection = object()
+
+    with spin.join_transaction(connection):
+        job = spin.schedule('record', connection='from-the-app')
+
+    assert broker.enqueued == []
+    assert broker.tx_enqueued[0][0] is connection
+    scheduled = broker.tx_enqueued[0][1][0]
+    assert scheduled is job
+    assert scheduled.task_kwargs == {'connection': 'from-the-app'}
+
+    spin.schedule('record', connection='later')
+    assert len(broker.enqueued) == 1
+    assert broker.enqueued[0].task_kwargs == {'connection': 'later'}
 
 
 def test_start_workers_blocking():

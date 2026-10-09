@@ -1,16 +1,43 @@
+import os
+
 import pytest
-import time
 
 from spinach.brokers.memory import MemoryBroker
 from spinach.brokers.redis import RedisBroker
 from spinach.engine import Engine
 
 
-@pytest.fixture(params=[MemoryBroker, RedisBroker])
+def _postgres_broker():
+    from spinach.brokers.postgres import PostgresBroker
+    return PostgresBroker(
+        os.environ['SPINACH_TEST_POSTGRES_DSN'],
+        require_ssl=False,
+    )
+
+
+def _broker_params():
+    params = [
+        pytest.param(MemoryBroker, id='memory'),
+        pytest.param(RedisBroker, id='redis'),
+    ]
+    if os.environ.get('SPINACH_TEST_POSTGRES_DSN'):
+        params.append(pytest.param(_postgres_broker, id='postgres'))
+    return params
+
+
+@pytest.fixture(params=_broker_params())
 def spin(request):
-    broker = request.param
-    spin = Engine(broker(), namespace='tests')
-    yield spin
+    broker = request.param()
+    engine = Engine(broker, namespace='tests')
+    broker.flush()
+    try:
+        yield engine
+    finally:
+        if engine._workers is not None:
+            engine.stop_workers()
+        broker.flush()
+        if hasattr(broker, 'close'):
+            broker.close()
 
 
 def test_concurrency_limit(spin):

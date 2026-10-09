@@ -4,6 +4,7 @@
 -- join_transaction needs INSERT on spinach_queue_job and spinach_future_job
 -- plus USAGE on spinach_queue_job_position_seq.
 
+-- name: apply_schema()#
 CREATE TABLE IF NOT EXISTS spinach_schema (
     version integer PRIMARY KEY
 );

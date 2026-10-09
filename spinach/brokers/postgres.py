@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import contextvars
 from datetime import datetime, timezone
+import functools
 import json
 from logging import getLogger
 import math
@@ -11,9 +12,11 @@ from typing import Iterable, List, Optional, Tuple
 import uuid
 
 try:
+    import aiosql
     import psycopg
     from psycopg_pool import ConnectionPool
 except ImportError:  # pragma: no cover
+    aiosql = None
     psycopg = None
     ConnectionPool = None
 
@@ -25,9 +28,8 @@ from ..utils import call_with_retry, run_forever
 
 
 logger = getLogger('spinach.broker')
+here = path.abspath(path.dirname(__file__))
 
-_SCHEMA_PATH = path.join(path.dirname(path.abspath(__file__)),
-                         'postgres_schema.sql')
 _SCHEMA_VERSION = 1
 # (column, format_type, not_null). format_type is what Postgres reports.
 _SCHEMA_COLUMNS = {
@@ -112,42 +114,22 @@ _REQUIRED_DEFAULTS = {
     },
 }
 _NOTIFY_CHANNEL = 'spinach_notify'
-_LOCK_SCHEMA = (
-    "SELECT pg_advisory_lock(hashtext('spinach.schema')::bigint)"
-)
-_UNLOCK_SCHEMA = (
-    "SELECT pg_advisory_unlock(hashtext('spinach.schema')::bigint)"
-)
-_FLUSH_SQL = (
-    'DELETE FROM spinach_queue_job WHERE namespace = %s',
-    'DELETE FROM spinach_future_job WHERE namespace = %s',
-    'DELETE FROM spinach_running_job WHERE namespace = %s',
-    'DELETE FROM spinach_broker WHERE namespace = %s',
-    'DELETE FROM spinach_periodic_task WHERE namespace = %s',
-    'DELETE FROM spinach_concurrency WHERE namespace = %s',
-    'DELETE FROM spinach_idempotency WHERE namespace = %s',
-)
 
 # Value is (id(broker), connection). A new thread starts empty, so the
 # arbiter and the result notifier do not inherit a request transaction.
 _joined = contextvars.ContextVar('spinach_pg_joined', default=None)
 
 
-def _schema_statements():
-    with open(_SCHEMA_PATH, encoding='utf-8') as handle:
-        script = handle.read()
-    statements = []
-    for chunk in script.split(';'):
-        lines = []
-        for line in chunk.splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith('--'):
-                continue
-            lines.append(line)
-        statement = '\n'.join(lines).strip()
-        if statement:
-            statements.append(statement)
-    return statements
+@functools.lru_cache(maxsize=None)
+def _sql():
+    return aiosql.from_path(
+        path.join(here, 'postgres_scripts', 'postgres_queries.sql'), 'psycopg')
+
+
+@functools.lru_cache(maxsize=None)
+def _schema():
+    return aiosql.from_path(
+        path.join(here, 'postgres_scripts', 'postgres_schema.sql'), 'psycopg')
 
 
 def _cluster_identity(conn):
@@ -157,10 +139,7 @@ def _cluster_identity(conn):
     directory. Two connections match when they are the same cluster and
     the same database, whatever host string or socket they used.
     """
-    row = conn.execute(
-        'SELECT system_identifier, current_database() '
-        'FROM pg_control_system()'
-    ).fetchone()
+    row = _sql().cluster_identity(conn)
     return (int(row[0]), row[1])
 
 
@@ -182,7 +161,7 @@ def _assert_schema(conn):
     """
     for table, expected in _SCHEMA_COLUMNS.items():
         _assert_table(conn, table, expected, _SCHEMA_KEYS[table])
-    rows = conn.execute('SELECT version FROM spinach_schema').fetchall()
+    rows = list(_sql().schema_versions(conn))
     versions = {int(row[0]) for row in rows}
     if versions != {_SCHEMA_VERSION}:
         raise RuntimeError(
@@ -191,22 +170,13 @@ def _assert_schema(conn):
 
 
 def _assert_table(conn, table, expected, primary_key):
-    relation = conn.execute(
-        'SELECT to_regclass(%s)', (table,)
-    ).fetchone()[0]
+    relation = _sql().regclass(conn, name=table)
     if relation is None:
         raise RuntimeError(
             'spinach schema is missing %s. Apply '
-            'spinach/brokers/postgres_schema.sql' % table
+            'spinach/brokers/postgres_scripts/postgres_schema.sql' % table
         )
-    rows = conn.execute(
-        'SELECT a.attname, format_type(a.atttypid, a.atttypmod), '
-        'a.attnotnull '
-        'FROM pg_attribute a '
-        'WHERE a.attrelid = to_regclass(%s) '
-        'AND a.attnum > 0 AND NOT a.attisdropped',
-        (table,),
-    ).fetchall()
+    rows = list(_sql().table_columns(conn, name=table))
     found = {
         name: (typ, bool(not_null))
         for name, typ, not_null in rows
@@ -217,15 +187,7 @@ def _assert_table(conn, table, expected, primary_key):
                 'spinach schema column %s.%s must be %s'
                 % (table, name, typ)
             )
-    key_rows = conn.execute(
-        'SELECT a.attname '
-        'FROM pg_index i '
-        'JOIN pg_attribute a ON a.attrelid = i.indrelid '
-        'AND a.attnum = ANY(i.indkey) '
-        'WHERE i.indrelid = to_regclass(%s) AND i.indisprimary '
-        'ORDER BY array_position(i.indkey, a.attnum)',
-        (table,),
-    ).fetchall()
+    key_rows = list(_sql().primary_key_columns(conn, name=table))
     got = tuple(row[0] for row in key_rows)
     if got != primary_key:
         raise RuntimeError(
@@ -240,16 +202,8 @@ def _assert_defaults(conn, table):
     required = _REQUIRED_DEFAULTS.get(table)
     if not required:
         return
-    rows = conn.execute(
-        'SELECT a.attname, pg_get_expr(d.adbin, d.adrelid) '
-        'FROM pg_attribute a '
-        'LEFT JOIN pg_attrdef d '
-        'ON d.adrelid = a.attrelid AND d.adnum = a.attnum '
-        'WHERE a.attrelid = to_regclass(%s) '
-        'AND a.attname = ANY(%s) '
-        'AND a.attnum > 0 AND NOT a.attisdropped',
-        (table, list(required)),
-    ).fetchall()
+    rows = list(
+        _sql().column_defaults(conn, name=table, columns=list(required)))
     found = {name: expr for name, expr in rows}
     for column, (pattern, expected) in required.items():
         expr = found.get(column)
@@ -264,9 +218,7 @@ def _relation_ids(conn):
     """OIDs of the tables an unqualified joined enqueue would write."""
     found = {}
     for table in _JOINED_TABLES:
-        oid = conn.execute(
-            'SELECT to_regclass(%s)::oid', (table,)
-        ).fetchone()[0]
+        oid = _sql().relation_oid(conn, name=table)
         found[table] = None if oid is None else int(oid)
     return found
 
@@ -379,7 +331,7 @@ class PostgresBroker(Broker):
         super().__init__()
         if dsn is None or not str(dsn).strip():
             raise ValueError('dsn is required')
-        if psycopg is None or ConnectionPool is None:
+        if aiosql is None or psycopg is None or ConnectionPool is None:
             raise ImportError(
                 'PostgresBroker requires the postgres extra: '
                 'pip install spinach[postgres]'
@@ -427,10 +379,9 @@ class PostgresBroker(Broker):
             self._relation_ids = _relation_ids(conn)
 
     def _apply_schema(self, conn):
-        conn.execute(_LOCK_SCHEMA)
+        _sql().lock_schema(conn)
         try:
-            for statement in _schema_statements():
-                conn.execute(statement)
+            _schema().apply_schema(conn)
             conn.commit()
         except Exception:
             conn.rollback()
@@ -444,7 +395,7 @@ class PostgresBroker(Broker):
                 logger.exception(
                     'Ignoring rollback before schema unlock'
                 )
-            conn.execute(_UNLOCK_SCHEMA)
+            _sql().unlock_schema(conn)
             conn.commit()
 
     @contextmanager
@@ -546,12 +497,10 @@ class PostgresBroker(Broker):
 
     def _write_jobs(self, conn, jobs, from_failure, token):
         if token is not None:
-            row = conn.execute(
-                'INSERT INTO spinach_idempotency (namespace, token) '
-                'VALUES (%s, %s) ON CONFLICT DO NOTHING RETURNING token',
-                (self.namespace, token),
-            ).fetchone()
-            if row is None:
+            stored = _sql().insert_idempotency_token(
+                conn, namespace=self.namespace, token=token
+            )
+            if stored is None:
                 logger.info(
                     'Enqueue not reprocessed because it was already '
                     'processed once'
@@ -564,12 +513,9 @@ class PostgresBroker(Broker):
             if job.status is JobStatus.QUEUED:
                 self._insert_queue(conn, job)
             else:
-                conn.execute(
-                    'INSERT INTO spinach_future_job '
-                    '(namespace, job_id, at, payload) '
-                    'VALUES (%s, %s, %s, %s)',
-                    (self.namespace, job.id, _job_due(job),
-                     job.serialize()),
+                _sql().insert_future_job(
+                    conn, namespace=self.namespace, job_id=job.id,
+                    at=_job_due(job), payload=job.serialize(),
                 )
             if from_failure:
                 self._delete_running(conn, self._id, job.id)
@@ -579,55 +525,42 @@ class PostgresBroker(Broker):
         self._notify(conn)
 
     def _insert_queue(self, conn, job: Job):
-        conn.execute(
-            'INSERT INTO spinach_queue_job '
-            '(namespace, queue, job_id, task_name, payload) '
-            'VALUES (%s, %s, %s, %s, %s)',
-            (self.namespace, job.queue, job.id, job.task_name,
-             job.serialize()),
+        _sql().insert_queue_job(
+            conn, namespace=self.namespace, queue=job.queue,
+            job_id=job.id, task_name=job.task_name,
+            payload=job.serialize(),
         )
 
     def _insert_running(self, conn, job: Job):
-        conn.execute(
-            'INSERT INTO spinach_running_job ('
-            'namespace, broker_id, job_id, task_name, queue, '
-            'max_retries, retries, payload'
-            ') VALUES (%s, %s, %s, %s, %s, %s, %s, %s)',
-            (self.namespace, self._id, job.id, job.task_name, job.queue,
-             job.max_retries, job.retries, job.serialize()),
+        _sql().insert_running_job(
+            conn, namespace=self.namespace, broker_id=self._id,
+            job_id=job.id, task_name=job.task_name, queue=job.queue,
+            max_retries=job.max_retries, retries=job.retries,
+            payload=job.serialize(),
         )
 
     def _delete_running(self, conn, broker_id, job_id):
-        conn.execute(
-            'DELETE FROM spinach_running_job '
-            'WHERE namespace = %s AND broker_id = %s AND job_id = %s',
-            (self.namespace, broker_id, job_id),
+        _sql().delete_running_job(
+            conn, namespace=self.namespace, broker_id=broker_id,
+            job_id=job_id,
         )
 
     def _notify(self, conn):
-        conn.execute(
-            'SELECT pg_notify(%s, %s)',
-            (_NOTIFY_CHANNEL, self.namespace),
+        _sql().notify(
+            conn, channel=_NOTIFY_CHANNEL, payload=self.namespace
         )
 
     def _lock_concurrency(self, conn):
-        conn.execute(
-            'SELECT task_name FROM spinach_concurrency '
-            'WHERE namespace = %s ORDER BY task_name FOR UPDATE',
-            (self.namespace,),
-        )
+        _sql().lock_concurrency(conn, namespace=self.namespace)
 
     def _decrement_concurrency(self, conn, jobs):
         counts = {}
         for job in jobs:
             counts[job.task_name] = counts.get(job.task_name, 0) + 1
         for name in sorted(counts):
-            conn.execute(
-                'UPDATE spinach_concurrency '
-                'SET current_concurrency = GREATEST('
-                'current_concurrency - %s, 0) '
-                'WHERE namespace = %s AND task_name = %s',
-                (counts[name], self.namespace, name),
+            _sql().decrement_concurrency(
+                conn, namespace=self.namespace, task_name=name,
+                amount=counts[name],
             )
 
     def _increment_concurrency(self, conn, task_names):
@@ -635,11 +568,9 @@ class PostgresBroker(Broker):
         for name in task_names:
             counts[name] = counts.get(name, 0) + 1
         for name in sorted(counts):
-            conn.execute(
-                'UPDATE spinach_concurrency '
-                'SET current_concurrency = current_concurrency + %s '
-                'WHERE namespace = %s AND task_name = %s',
-                (counts[name], self.namespace, name),
+            _sql().increment_concurrency(
+                conn, namespace=self.namespace, task_name=name,
+                amount=counts[name],
             )
 
     def get_jobs_from_queue(self, queue: str, max_jobs: int) -> List[Job]:
@@ -654,20 +585,10 @@ class PostgresBroker(Broker):
         tracked = []
         skipped = []
         while len(jobs) < max_jobs:
-            row = conn.execute(
-                'SELECT q.payload, c.max_concurrency, '
-                'c.current_concurrency '
-                'FROM spinach_queue_job AS q '
-                'LEFT JOIN spinach_concurrency AS c '
-                'ON c.namespace = q.namespace '
-                'AND c.task_name = q.task_name '
-                'WHERE q.namespace = %s AND q.queue = %s '
-                'AND NOT (q.job_id = ANY(%s::uuid[])) '
-                'ORDER BY q.position '
-                'LIMIT 1 '
-                'FOR UPDATE OF q SKIP LOCKED',
-                (self.namespace, queue, skipped),
-            ).fetchone()
+            row = _sql().claim_next_job(
+                conn, namespace=self.namespace, queue=queue,
+                skipped=skipped,
+            )
             if row is None:
                 break
             payload, maximum, current = row
@@ -688,10 +609,8 @@ class PostgresBroker(Broker):
         return jobs
 
     def _delete_queue_job(self, conn, job_id):
-        conn.execute(
-            'DELETE FROM spinach_queue_job '
-            'WHERE namespace = %s AND job_id = %s',
-            (self.namespace, job_id),
+        _sql().delete_queue_job(
+            conn, namespace=self.namespace, job_id=job_id
         )
 
     def remove_job_from_running(self, job: Job):
@@ -703,24 +622,19 @@ class PostgresBroker(Broker):
 
     def is_queue_empty(self, queue: str) -> bool:
         with self._transaction() as conn:
-            row = conn.execute(
-                'SELECT NOT EXISTS ('
-                'SELECT 1 FROM spinach_queue_job '
-                'WHERE namespace = %s AND queue = %s)',
-                (self.namespace, queue),
-            ).fetchone()
-        return bool(row[0])
+            empty = _sql().is_queue_empty(
+                conn, namespace=self.namespace, queue=queue
+            )
+        return bool(empty)
 
     def _get_next_future_job(self) -> Optional[Job]:
         with self._transaction() as conn:
-            row = conn.execute(
-                'SELECT payload FROM spinach_future_job '
-                'WHERE namespace = %s ORDER BY at LIMIT 1',
-                (self.namespace,),
-            ).fetchone()
-        if row is None:
+            payload = _sql().next_future_job_payload(
+                conn, namespace=self.namespace
+            )
+        if payload is None:
             return None
-        return Job.deserialize(row[0])
+        return Job.deserialize(payload)
 
     def move_future_jobs(self) -> int:
         now_score = int(math.ceil(
@@ -729,30 +643,20 @@ class PostgresBroker(Broker):
         now_dt = _score_time(now_score)
         with self._transaction() as conn:
             info = self._get_broker_info()
-            conn.execute(
-                'INSERT INTO spinach_broker '
-                '(namespace, broker_id, last_seen_at, info) '
-                'VALUES (%s, %s, %s, %s) '
-                'ON CONFLICT (namespace, broker_id) DO UPDATE '
-                'SET last_seen_at = EXCLUDED.last_seen_at, '
-                'info = EXCLUDED.info',
-                (self.namespace, self._id, info['last_seen_at'],
-                 json.dumps(info)),
+            _sql().upsert_broker(
+                conn, namespace=self.namespace, broker_id=self._id,
+                last_seen_at=info['last_seen_at'],
+                info=json.dumps(info),
             )
-            conn.execute(
-                'DELETE FROM spinach_idempotency '
-                'WHERE namespace = %s AND created_at < '
-                "statement_timestamp() - interval '1 hour'",
-                (self.namespace,),
+            _sql().purge_idempotency_tokens(
+                conn, namespace=self.namespace
             )
             cutoff = now_score - self.broker_dead_threshold_seconds
-            dead_rows = conn.execute(
-                'SELECT broker_id::text FROM spinach_broker '
-                'WHERE namespace = %s AND last_seen_at <= %s '
-                'ORDER BY last_seen_at LIMIT 10',
-                (self.namespace, cutoff),
-            ).fetchall()
-            dead_ids = [row[0] for row in dead_rows]
+            dead_ids = [
+                row[0] for row in _sql().find_dead_brokers(
+                    conn, namespace=self.namespace, cutoff=cutoff
+                )
+            ]
             moved = self._move_due_future_jobs(conn, now_dt)
             moved += self._fire_periodic(conn, now_score, now_dt)
             if moved:
@@ -761,33 +665,25 @@ class PostgresBroker(Broker):
         return moved
 
     def _move_due_future_jobs(self, conn, now_dt):
-        rows = conn.execute(
-            'SELECT job_id, payload FROM spinach_future_job '
-            'WHERE namespace = %s AND at <= %s '
-            'ORDER BY at LIMIT 1000 FOR UPDATE',
-            (self.namespace, now_dt),
-        ).fetchall()
+        rows = list(_sql().select_due_future_jobs(
+            conn, namespace=self.namespace, due=now_dt
+        ))
         for job_id, payload in rows:
             job = Job.deserialize(payload)
             job.status = JobStatus.QUEUED
             self._insert_queue(conn, job)
-            conn.execute(
-                'DELETE FROM spinach_future_job '
-                'WHERE namespace = %s AND job_id = %s',
-                (self.namespace, job_id),
+            _sql().delete_future_job(
+                conn, namespace=self.namespace, job_id=job_id
             )
         return len(rows)
 
     def _fire_periodic(self, conn, now_score, now_dt):
         if self._number_periodic_tasks < 1:
             return 0
-        rows = conn.execute(
-            'SELECT name, payload, periodicity_seconds '
-            'FROM spinach_periodic_task '
-            'WHERE namespace = %s AND next_at <= %s '
-            'ORDER BY next_at LIMIT %s FOR UPDATE',
-            (self.namespace, now_dt, self._number_periodic_tasks),
-        ).fetchall()
+        rows = list(_sql().select_due_periodic_tasks(
+            conn, namespace=self.namespace, due=now_dt,
+            max_tasks=self._number_periodic_tasks,
+        ))
         at = _score_time(now_score)
         for name, payload, period in rows:
             task = json.loads(payload)
@@ -795,10 +691,9 @@ class PostgresBroker(Broker):
             job.status = JobStatus.QUEUED
             self._insert_queue(conn, job)
             next_at = _score_time(int(now_score) + int(period))
-            conn.execute(
-                'UPDATE spinach_periodic_task SET next_at = %s '
-                'WHERE namespace = %s AND name = %s',
-                (next_at, self.namespace, name),
+            _sql().advance_periodic_task(
+                conn, namespace=self.namespace, name=name,
+                next_at=next_at,
             )
         return len(rows)
 
@@ -841,12 +736,9 @@ class PostgresBroker(Broker):
         self._number_periodic_tasks = len(tasks)
         now_score = int(self.start_at().timestamp())
         with self._transaction() as conn:
-            rows = conn.execute(
-                'SELECT name, periodicity_seconds, payload '
-                'FROM spinach_periodic_task '
-                'WHERE namespace = %s ORDER BY name FOR UPDATE',
-                (self.namespace,),
-            ).fetchall()
+            rows = list(_sql().select_periodic_tasks_for_update(
+                conn, namespace=self.namespace
+            ))
             existing = {}
             for name, period, payload in rows:
                 stored = json.loads(payload)
@@ -869,52 +761,41 @@ class PostgresBroker(Broker):
                 previous = existing.get(task.name)
                 if previous is None:
                     next_at = _score_time(now_score + period + start)
-                    conn.execute(
-                        'INSERT INTO spinach_periodic_task ('
-                        'namespace, name, periodicity_seconds, next_at, '
-                        'payload) VALUES (%s, %s, %s, %s, %s)',
-                        (self.namespace, task.name, period, next_at,
-                         payload),
+                    _sql().insert_periodic_task(
+                        conn, namespace=self.namespace, name=task.name,
+                        periodicity_seconds=period, next_at=next_at,
+                        payload=payload,
                     )
                 elif previous[1] != start:
                     next_at = _score_time(now_score + period + start)
-                    conn.execute(
-                        'UPDATE spinach_periodic_task '
-                        'SET periodicity_seconds = %s, next_at = %s, '
-                        'payload = %s WHERE namespace = %s AND name = %s',
-                        (period, next_at, payload, self.namespace,
-                         task.name),
+                    _sql().update_periodic_task_schedule(
+                        conn, namespace=self.namespace, name=task.name,
+                        periodicity_seconds=period, next_at=next_at,
+                        payload=payload,
                     )
                 elif previous[0] != period:
                     next_at = _score_time(now_score + period)
-                    conn.execute(
-                        'UPDATE spinach_periodic_task '
-                        'SET periodicity_seconds = %s, next_at = %s, '
-                        'payload = %s WHERE namespace = %s AND name = %s',
-                        (period, next_at, payload, self.namespace,
-                         task.name),
+                    _sql().update_periodic_task_schedule(
+                        conn, namespace=self.namespace, name=task.name,
+                        periodicity_seconds=period, next_at=next_at,
+                        payload=payload,
                     )
                 else:
-                    conn.execute(
-                        'UPDATE spinach_periodic_task SET payload = %s '
-                        'WHERE namespace = %s AND name = %s',
-                        (payload, self.namespace, task.name),
+                    _sql().update_periodic_task_payload(
+                        conn, namespace=self.namespace, name=task.name,
+                        payload=payload,
                     )
             for name in existing:
                 if name not in seen:
-                    conn.execute(
-                        'DELETE FROM spinach_periodic_task '
-                        'WHERE namespace = %s AND name = %s',
-                        (self.namespace, name),
+                    _sql().delete_periodic_task(
+                        conn, namespace=self.namespace, name=name
                     )
 
     def inspect_periodic_tasks(self) -> List[Tuple[int, str]]:
         with self._transaction() as conn:
-            rows = conn.execute(
-                'SELECT next_at, name FROM spinach_periodic_task '
-                'WHERE namespace = %s ORDER BY next_at, name',
-                (self.namespace,),
-            ).fetchall()
+            rows = list(_sql().list_periodic_tasks(
+                conn, namespace=self.namespace
+            ))
         return [
             (int(round(row[0].timestamp())), row[1]) for row in rows
         ]
@@ -922,15 +803,13 @@ class PostgresBroker(Broker):
     @property
     def next_future_periodic_delta(self) -> Optional[float]:
         with self._transaction() as conn:
-            row = conn.execute(
-                'SELECT next_at FROM spinach_periodic_task '
-                'WHERE namespace = %s ORDER BY next_at LIMIT 1',
-                (self.namespace,),
-            ).fetchone()
-        if row is None:
+            next_at = _sql().next_periodic_at(
+                conn, namespace=self.namespace
+            )
+        if next_at is None:
             return None
         delta = (
-            row[0] - datetime.now(timezone.utc)
+            next_at - datetime.now(timezone.utc)
         ).total_seconds()
         if delta < 0:
             return 0
@@ -947,58 +826,44 @@ class PostgresBroker(Broker):
                 if maximum == -1:
                     continue
                 names.append(task.name)
-                conn.execute(
-                    'INSERT INTO spinach_concurrency ('
-                    'namespace, task_name, max_concurrency, '
-                    'current_concurrency) VALUES (%s, %s, %s, 0) '
-                    'ON CONFLICT (namespace, task_name) DO UPDATE '
-                    'SET max_concurrency = EXCLUDED.max_concurrency',
-                    (self.namespace, task.name, maximum),
+                _sql().upsert_concurrency(
+                    conn, namespace=self.namespace, task_name=task.name,
+                    max_concurrency=maximum,
                 )
             if names:
-                conn.execute(
-                    'DELETE FROM spinach_concurrency '
-                    'WHERE namespace = %s AND NOT (task_name = ANY(%s))',
-                    (self.namespace, names),
+                _sql().delete_concurrency_not_in(
+                    conn, namespace=self.namespace, task_names=names
                 )
             else:
-                conn.execute(
-                    'DELETE FROM spinach_concurrency WHERE namespace = %s',
-                    (self.namespace,),
+                _sql().delete_all_concurrency(
+                    conn, namespace=self.namespace
                 )
 
     def flush(self):
         with self._transaction() as conn:
-            for statement in _FLUSH_SQL:
-                conn.execute(statement, (self.namespace,))
+            _sql().flush(conn, namespace=self.namespace)
 
     def get_all_brokers(self):
         with self._transaction() as conn:
-            rows = conn.execute(
-                'SELECT info FROM spinach_broker WHERE namespace = %s',
-                (self.namespace,),
-            ).fetchall()
+            rows = list(_sql().list_broker_infos(
+                conn, namespace=self.namespace
+            ))
         return [json.loads(row[0]) for row in rows]
 
     def enqueue_jobs_from_dead_broker(
-            self, dead_broker_id: uuid.UUID
+        self, dead_broker_id: uuid.UUID
     ) -> Tuple[int, list]:
         with self._transaction() as conn:
             return self._requeue_dead(conn, dead_broker_id)
 
     def _requeue_dead(self, conn, dead_broker_id):
-        conn.execute(
-            'SELECT broker_id FROM spinach_broker '
-            'WHERE namespace = %s AND broker_id = %s FOR UPDATE',
-            (self.namespace, dead_broker_id),
+        _sql().lock_broker(
+            conn, namespace=self.namespace, broker_id=dead_broker_id
         )
         self._lock_concurrency(conn)
-        rows = conn.execute(
-            'SELECT payload FROM spinach_running_job '
-            'WHERE namespace = %s AND broker_id = %s '
-            'ORDER BY task_name, job_id FOR UPDATE',
-            (self.namespace, dead_broker_id),
-        ).fetchall()
+        rows = list(_sql().select_running_jobs_of_broker(
+            conn, namespace=self.namespace, broker_id=dead_broker_id
+        ))
         tracked = []
         retryable = []
         failed = []
@@ -1014,15 +879,11 @@ class PostgresBroker(Broker):
         self._decrement_concurrency(conn, tracked)
         for job in retryable:
             self._insert_queue(conn, job)
-        conn.execute(
-            'DELETE FROM spinach_running_job '
-            'WHERE namespace = %s AND broker_id = %s',
-            (self.namespace, dead_broker_id),
+        _sql().delete_running_jobs_of_broker(
+            conn, namespace=self.namespace, broker_id=dead_broker_id
         )
-        conn.execute(
-            'DELETE FROM spinach_broker '
-            'WHERE namespace = %s AND broker_id = %s',
-            (self.namespace, dead_broker_id),
+        _sql().delete_broker(
+            conn, namespace=self.namespace, broker_id=dead_broker_id
         )
         if retryable:
             self._notify(conn)
@@ -1055,10 +916,8 @@ class PostgresBroker(Broker):
             return
         try:
             with self._transaction() as conn:
-                conn.execute(
-                    'DELETE FROM spinach_broker '
-                    'WHERE namespace = %s AND broker_id = %s',
-                    (self.namespace, self._id),
+                _sql().delete_broker(
+                    conn, namespace=self.namespace, broker_id=self._id
                 )
         except Exception:
             logger.exception('Failed to deregister Postgres broker')

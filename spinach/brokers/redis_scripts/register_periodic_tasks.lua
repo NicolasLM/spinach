@@ -20,13 +20,18 @@ for i=4, #ARGV do
 
     if redis.call('hexists', periodic_tasks_hash, task["name"]) == 0 then
         -- the periodic task is new, add it to the queue
+        next_event_time = next_event_time + task["periodicity_start"]
         redis.call('zadd', periodic_tasks_queue, next_event_time, task["name"])
     else
         local existing_task_json = redis.call('hget', periodic_tasks_hash, task["name"])
         local existing_task = cjson.decode(existing_task_json)
+        -- the periodic task already existed but the periodicity or
+        -- periodicity_start changed, so it is reset
+        if existing_task["periodicity_start"] ~= task["periodicity_start"] then
+            next_event_time = next_event_time + task["periodicity_start"]
+            existing_task["periodicity"] = nil
+        end
         if existing_task["periodicity"] ~= task["periodicity"] then
-            -- the periodic task already existed but the periodicity changed
-            -- so it is reset
             redis.call('zadd', periodic_tasks_queue, next_event_time, task["name"])
         end
     end

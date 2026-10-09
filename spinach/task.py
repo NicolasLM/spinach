@@ -14,17 +14,19 @@ class Task:
 
     __slots__ = [
         'func', 'name', 'queue', 'max_retries', 'periodicity',
-        'max_concurrency',
+        'periodicity_start', 'max_concurrency',
     ]
 
     def __init__(self, func: Callable, name: str, queue: str,
                  max_retries: Number, periodicity: Optional[timedelta],
+                 periodicity_start: Optional[timedelta]=None,
                  max_concurrency: Optional[int]=None):
         self.func = func
         self.name = name
         self.queue = queue
         self.max_retries = max_retries
         self.periodicity = periodicity
+        self.periodicity_start = 0
         self.max_concurrency = max_concurrency
 
         # Prevent initialisation with max_concurrency set and
@@ -36,6 +38,18 @@ class Task:
                 )
             if max_concurrency < 1:
                 raise ValueError("max_concurrency must be greater than zero")
+        # "snap" periodicity to the next periodicity_start value
+        if periodicity_start is not None:
+            if periodicity is None:
+                raise ValueError(
+                    "periodicity must be set if periodicity_start is set"
+                )
+            ps = int(periodicity_start.total_seconds())
+            if ps > periodicity.total_seconds():
+                raise ValueError("periodicity_start must be < periodicity")
+            if ps > 43200:
+                raise ValueError("periodicity_start must be <= 12 hours")
+            self.periodicity_start = self._snap_to(periodicity_start)
 
     def serialize(self):
         periodicity = (int(self.periodicity.total_seconds())
@@ -45,6 +59,7 @@ class Task:
             'queue': self.queue,
             'max_retries': self.max_retries,
             'periodicity': periodicity,
+            'periodicity_start': self.periodicity_start,
             'max_concurrency': self.max_concurrency or -1,
         }, sort_keys=True)
 
@@ -53,9 +68,9 @@ class Task:
         return self.name
 
     def __repr__(self):
-        return 'Task({}, {}, {}, {}, {}, {})'.format(
+        return 'Task({}, {}, {}, {}, {}, {}, {})'.format(
             self.func, self.name, self.queue, self.max_retries,
-            self.periodicity, self.max_concurrency,
+            self.periodicity, self.periodicity_start, self.max_concurrency,
         )
 
     def __eq__(self, other):
@@ -66,6 +81,29 @@ class Task:
             except AttributeError:
                 return False
         return True
+
+    def _snap_to(self, snap_interval: timedelta) -> int:
+        # NOTE(nic): we treat the timedelta object as three distinct snap
+        #  values, packed together.  When applying them, we snap to the
+        #  largest defined unit, and add the smaller units unconditionally.
+        #  This is because while an hourly periodic with a snap of 15m15s
+        #  would *technically* snap to the top of the hour, the intent of such
+        #  a snap interval is pretty clearly "run this 15 seconds after the
+        #  next quarter-hour".  It's also simpler.
+        now = datetime.now(tz=timezone.utc).replace(microsecond=0)
+        epoch = datetime.fromtimestamp(0, tz=timezone.utc)
+        delta = epoch + snap_interval
+        mod = 0
+        if delta.hour:
+            mod = (now - epoch) % timedelta(hours=delta.hour)
+        elif delta.minute:
+            mod = (now - epoch) % timedelta(minutes=delta.minute)
+        elif delta.second:
+            mod = (now - epoch) % timedelta(seconds=delta.second)
+
+        if not mod:
+            return 0
+        return int((snap_interval - mod).total_seconds())
 
 
 Schedulable = Union[str, Callable, Task]
@@ -78,6 +116,8 @@ class Tasks:
     :arg max_retries: default retry policy for tasks
     :arg periodicity: for periodic tasks, delay between executions as a
          timedelta
+    :arg periodicity_start: for periodic tasks, clamp the start time to the
+         given interval, expressed as a timedelta
     :arg max_concurrency: maximum number of simultaneous Jobs that can be
         started for this Task. Requires max_retries to be also set.
     """
@@ -87,11 +127,13 @@ class Tasks:
     def __init__(self, queue: Optional[str]=None,
                  max_retries: Optional[Number]=None,
                  periodicity: Optional[timedelta]=None,
+                 periodicity_start: Optional[timedelta]=None,
                  max_concurrency: Optional[int]=None):
         self._tasks = {}
         self.queue = queue
         self.max_retries = max_retries
         self.periodicity = periodicity
+        self.periodicity_start = periodicity_start
         self.max_concurrency = max_concurrency
         self._spin = None
 
@@ -122,6 +164,7 @@ class Tasks:
     def task(self, func: Optional[Callable]=None, name: Optional[str]=None,
              queue: Optional[str]=None, max_retries: Optional[Number]=None,
              periodicity: Optional[timedelta]=None,
+             periodicity_start: Optional[timedelta]=None,
              max_concurrency: Optional[int]=None):
         """Decorator to register a task function.
 
@@ -131,6 +174,8 @@ class Tasks:
              not provided
         :arg periodicity: for periodic tasks, delay between executions as a
              timedelta
+        :arg periodicity_start: for periodic tasks, clamp the start time to the
+             given interval, expressed as a timedelta
         :arg max_concurrency: maximum number of simultaneous Jobs that can be
             started for this Task. Requires max_retries to be also set.
 
@@ -143,10 +188,12 @@ class Tasks:
             return functools.partial(self.task, name=name, queue=queue,
                                      max_retries=max_retries,
                                      periodicity=periodicity,
+                                     periodicity_start=periodicity_start,
                                      max_concurrency=max_concurrency)
 
         self.add(func, name=name, queue=queue, max_retries=max_retries,
-                 periodicity=periodicity, max_concurrency=max_concurrency)
+                 periodicity=periodicity, periodicity_start=periodicity_start,
+                 max_concurrency=max_concurrency)
 
         # Add an attribute to the function to be able to conveniently use it as
         # spin.schedule(function) instead of spin.schedule('task_name')
@@ -157,6 +204,7 @@ class Tasks:
     def add(self, func: Callable, name: Optional[str]=None,
             queue: Optional[str]=None, max_retries: Optional[Number]=None,
             periodicity: Optional[timedelta]=None,
+            periodicity_start: Optional[timedelta]=None,
             max_concurrency: Optional[int]=None):
         """Register a task function.
 
@@ -167,6 +215,8 @@ class Tasks:
              not provided
         :arg periodicity: for periodic tasks, delay between executions as a
              timedelta
+        :arg periodicity_start: for periodic tasks, clamp the start time to the
+             given interval, expressed as a timedelta
         :arg max_concurrency: maximum number of simultaneous Jobs that can be
             started for this Task. Requires max_retries to be also set.
 
@@ -192,6 +242,8 @@ class Tasks:
 
         if periodicity is None:
             periodicity = self.periodicity
+        if periodicity_start is None:
+            periodicity_start = self.periodicity_start
         if max_concurrency is None:
             max_concurrency = self.max_concurrency
 
@@ -200,7 +252,8 @@ class Tasks:
                              'Spinach for internal use')
 
         self._tasks[name] = Task(
-            func, name, queue, max_retries, periodicity, max_concurrency
+            func, name, queue, max_retries, periodicity, periodicity_start,
+            max_concurrency
         )
 
     def _require_attached_tasks(self):

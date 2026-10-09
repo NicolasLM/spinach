@@ -59,6 +59,7 @@ setup(
         ],
         # psycopg 3.3 requires Python 3.10. Older interpreters keep 3.2.
         'postgres': [
+            'aiosql',
             'psycopg[binary]>=3.1,<3.3; python_version < "3.10"',
             'psycopg[binary]>=3.1; python_version >= "3.10"',
             'psycopg_pool>=3.1,<3.3; python_version < "3.10"',
@@ -67,9 +68,6 @@ setup(
     },
 
     package_data={
-        'spinach.brokers': [
-            'postgres_schema.sql',
-        ],
         'spinach.brokers.redis_scripts': [
             'deregister.lua',
             'enqueue_job.lua',
@@ -81,5 +79,9 @@ setup(
             'remove_job_from_running.lua',
             'set_concurrency_keys.lua',
         ],
+        'spinach.brokers.postgres_scripts': [
+            'postgres_schema.sql',
+            'postgres_queries.sql',
+        ]
     },
 )

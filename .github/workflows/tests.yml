@@ -6,7 +6,8 @@ jobs:
 
   test:
 
-    runs-on: ubuntu-latest
+    # TODO(nic): don't know if it's worth it to keep support for EOL Pythons...
+    runs-on: ${{ matrix.python-version == '3.9' && 'ubuntu-24.04' || 'ubuntu-latest' }}
     strategy:
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "pypy3.10"]

@@ -81,7 +81,7 @@ def test_eq(job):
 
 
 def test_at_timezone_naive():
-    now_naive = datetime.utcnow()
+    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
     job = Job('foo_task', 'foo_queue', now_naive, 5,
               task_args=(1, 2), task_kwargs={'foo': 'bar'})
     assert job.at.tzinfo is timezone.utc

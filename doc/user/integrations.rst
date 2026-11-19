@@ -163,8 +163,25 @@ The working queue and the number of threads can be changed with::
 Sending emails in the background
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Spinach app provides an ``EMAIL_BACKEND`` allowing to send emails as background tasks. To use
-it simply add it to ``settings.py``::
+The Spinach app provides an email backend allowing to send emails as background tasks. With
+Django 6.1 or later, add it to the ``MAILERS`` setting and also define the "actual" backend
+that the worker should use::
+
+    MAILERS = {
+        'default': {
+            'BACKEND': 'spinach.contrib.spinachd.mail.BackgroundEmailBackend',
+        },
+        'spinach': {
+            'BACKEND': 'django.core.mail.backends.smtp.EmailBackend',
+            'OPTIONS': {'host': 'smtp.example.com', 'use_tls': True},
+        },
+    }
+    SPINACH_MAILER = 'spinach'
+
+The alias of the delivering mailer can be changed with ``SPINACH_MAILER``.
+
+On Django versions before 6.1, use the legacy setting ``EMAIL_BACKEND`` instead.
+The "actual" mailer is set via ``SPINACH_ACTUAL_EMAIL_BACKEND``::
 
     EMAIL_BACKEND = 'spinach.contrib.spinachd.mail.BackgroundEmailBackend'
     SPINACH_ACTUAL_EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -193,9 +210,10 @@ Configuration
 
 - ``SPINACH_BROKER``, default ``spinach.RedisBroker()``
 - ``SPINACH_NAMESPACE``, default ``spinach``
-- ``SPINACH_ACTUAL_EMAIL_BACKEND``, default
-  ``django.core.mail.backends.smtp.EmailBackend``
+- ``SPINACH_MAILER``, default ``spinach``
 - ``SPINACH_CLEAR_SESSIONS_PERIODICITY``, default ``None`` (disabled)
+- ``SPINACH_ACTUAL_EMAIL_BACKEND``, default ``django.core.mail.backends.smtp.EmailBackend``,
+  deprecated, only used in Django < 6.1
 
 Sentry
 ------

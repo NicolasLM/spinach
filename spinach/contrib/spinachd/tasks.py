@@ -4,12 +4,14 @@ from typing import List
 
 from django.apps import apps
 from django.conf import settings
-from django.core.mail import get_connection
+from django.core import mail
+from django import VERSION as DJANGO_VERSION
 
 from spinach import Tasks
 
 from .settings import (
     SPINACH_ACTUAL_EMAIL_BACKEND,
+    SPINACH_MAILER,
     SPINACH_CLEAR_SESSIONS_PERIODICITY as PERIODICITY
 )
 
@@ -17,13 +19,20 @@ tasks = Tasks()
 logger = getLogger(__name__)
 
 
+def _get_connection():
+    if DJANGO_VERSION >= (6, 1):
+        return mail.mailers[SPINACH_MAILER]
+    # Django < 6.1
+    return mail.get_connection(SPINACH_ACTUAL_EMAIL_BACKEND)
+
+
 @tasks.task(name='spinachd:send_emails')
 def send_emails(messages: List[str]):
     from .mail import deserialize_email_messages
     messages = deserialize_email_messages(messages)
-    connection = get_connection(SPINACH_ACTUAL_EMAIL_BACKEND)
-    logger.info('Sending %d emails using %s', len(messages),
-                SPINACH_ACTUAL_EMAIL_BACKEND)
+    connection = _get_connection()
+    logger.info('Sending %d emails using %s.%s', len(messages),
+                type(connection).__module__, type(connection).__qualname__)
     connection.send_messages(messages)
 
 

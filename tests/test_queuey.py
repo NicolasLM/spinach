@@ -20,20 +20,28 @@ def test_sync():
     assert len(q._getters) == 0
 
 
+# TODO(nic): newer Python has the asyncio.Runner() context manager for
+#  managing event loops, if Python <3.11 support is dropped, this should be
+#  reimplemented, as it will make the test cleaner
 def test_async():
     q = Queuey(2)
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(q.put_async(1))
-    loop.run_until_complete(q.put_async(2))
-    assert len(q._items) == 2
-    assert len(q._putters) == 0
-    assert len(q._getters) == 0
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(q.put_async(1))
+        loop.run_until_complete(q.put_async(2))
+        assert len(q._items) == 2
+        assert len(q._putters) == 0
+        assert len(q._getters) == 0
 
-    assert loop.run_until_complete(q.get_async()) == 1
-    assert loop.run_until_complete(q.get_async()) == 2
-    assert len(q._items) == 0
-    assert len(q._putters) == 0
-    assert len(q._getters) == 0
+        assert loop.run_until_complete(q.get_async()) == 1
+        assert loop.run_until_complete(q.get_async()) == 2
+        assert len(q._items) == 0
+        assert len(q._putters) == 0
+        assert len(q._getters) == 0
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
 
 
 def test_noblock():

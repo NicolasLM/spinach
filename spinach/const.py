@@ -1,4 +1,6 @@
-VERSION = '0.0.25'
+from importlib.metadata import version
+
+VERSION = version('spinach')
 
 DEFAULT_QUEUE = 'spinach'
 DEFAULT_NAMESPACE = 'spinach'

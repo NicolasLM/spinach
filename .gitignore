@@ -11,3 +11,6 @@ doc/_build
 .pytest_cache
 
 tags
+.venv
+
+uv.lock

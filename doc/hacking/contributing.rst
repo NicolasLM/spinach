@@ -30,21 +30,21 @@ Python sources
 The code base follows `pep8 <https://www.python.org/dev/peps/pep-0008/>`_ guidelines with lines
 wrapping at the 79th character. You can verify that the code follows the conventions with::
 
-    $ pycodestyle --ignore=E252,W503,W504 spinach tests
+    $ uv run pycodestyle --ignore=E252,W503,W504 spinach tests
 
 Running tests is an invaluable help when adding a new feature or when refactoring. Try to add the
 proper test cases in ``tests/`` together with your patch. The test suite can be run with pytest::
 
-    $ pytest tests
+    $ uv run pytest tests
 
-Because the Redis broker tests require a running Redis server, there is also a convenience
-`tox.ini` that runs all the tests and pep8 checks for you after starting Redis in a container via
-docker-compose.  Simply running::
+Spinach uses `uv <https://docs.astral.sh/uv/>`_ to manage the development environment. The first
+``uv run`` command creates a virtualenv and installs Spinach and its development dependencies. The
+PostgreSQL broker tests additionally require a database DSN, for example::
 
-    $ tox
+    $ SPINACH_TEST_POSTGRES_DSN=postgresql://postgres@127.0.0.1:5432/spinach uv run pytest tests
 
-will build a virtualenv, install Spinach and its dependencies into it, start the Redis server in
-the container, and run tests and pycodestyle, tearing down the Redis server container when done.
+Because the Redis and PostgreSQL broker tests require running servers, pytest starts them in
+containers via docker-compose before the tests and tears them down when done.
 
 Compatibility
 -------------

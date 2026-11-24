@@ -1,4 +1,6 @@
+import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
@@ -49,3 +51,18 @@ def set_now(now: datetime):
         # verbose tests
         now = now.replace(tzinfo=timezone.utc)
     _now = now
+
+
+CONFIG_YAML = Path(__file__).parent / 'docker-compose.yml'
+COMPOSE = ('docker', 'compose', '--file', str(CONFIG_YAML))
+
+
+def pytest_collection_finish(session):
+    if not session.config.option.collectonly:
+        # --wait implies --detach, but explicit is better than implicit...
+        subprocess.run(COMPOSE + ('up', '--detach', '--wait'), check=True)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    if not session.config.option.collectonly:
+        subprocess.run(COMPOSE + ('down',), check=True)

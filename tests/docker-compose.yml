@@ -1,4 +1,5 @@
 ---
+name: spinach-tests
 services:
     redis:
         image: docker.io/redis:latest
